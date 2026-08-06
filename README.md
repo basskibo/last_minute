@@ -1,38 +1,39 @@
 # Poslednji Trenutak
 
-Agregator last-minute ponuda smeštaja i paket aranžmana. Korisnik unese
-destinaciju, fleksibilan period (mesec) i broj osoba (odrasli/deca) —
-aplikacija prikuplja dostupne ponude sa više izvora i prikazuje ih na jednom
-mestu, sortirane po ceni ili popustu.
+A last-minute accommodation and package-deal aggregator. The user enters a
+destination, a flexible period (month), and the number of people
+(adults/children) — the app collects available offers from multiple sources
+and shows them in one place, sorted by price or discount.
 
-## Kako radi
+## How it works
 
-- **Nema baze podataka.** Rezultati se dobijaju uživo scrape-ovanjem izvora
-  pri svakoj pretrazi, uz opciono kratkotrajno keširanje (par sati) preko
-  Upstash Redis-a da se ne opterećuju izvori i da odgovor bude brz.
-- **Izvori (`lib/providers/`):**
-  - `lastminuteponude.ts` — obično HTML scrape-ovanje (cheerio/fetch) sajta
-    [lastminuteponude.com](https://www.lastminuteponude.com), koji sam po
-    sebi agregira desetine srpskih agencija (Oktopod, Sole Azur, Viva
-    Travel, Astra Travel, Hedonic Travel i dr.).
-  - `oktopod.ts` — HTML scrape tabele cena po smeštaju/terminu/sobnosti,
-    trenutno mapirano samo za Grčku (jedina potvrđena stranica sa
-    strukturiranom tabelom — ostale Oktopod kampanje su PDF/najave bez
-    parsabilnih podataka).
-  - `booking.ts`, `airbnb.ts` — **headless browser (Playwright)**. Oba sajta
-    blokiraju obične HTTP zahteve (Booking odmah vraća AWS WAF JS-challenge;
-    Airbnb renderuje sve klijentski), pa se koristi pravi Chromium
-    (`lib/browser.ts`) koji izvrši JS i pročita rezultate iz DOM-a. Sporije
-    od običnog fetch-a (par sekundi po pretrazi) i osetljivije na promene
-    DOM strukture izvora.
-- Svaki izvor ima svoj timeout i pada nezavisno (`Promise.allSettled` u
-  `lib/search.ts`) — ako jedan izvor otkaže, ostali i dalje rade. Rezultati
-  koji nemaju detaljnu sobnost (Booking/Airbnb/lastminuteponude) prikazuju
-  aproksimaciju "ukupno" (cena × broj osoba); Oktopod ima stvarnu tabelu
-  sobnosti pa bira sobu čiji kapacitet najbolje odgovara traženom broju
-  osoba (`lib/rooms.ts`).
+- **No database.** Results are fetched live by scraping sources on every
+  search, with optional short-lived caching (a few hours) via Upstash Redis
+  so sources aren't hammered and responses stay fast.
+- **Sources (`lib/providers/`):**
+  - `lastminuteponude.ts` — plain HTML scraping (cheerio/fetch) of
+    [lastminuteponude.com](https://www.lastminuteponude.com), which itself
+    aggregates dozens of Serbian agencies (Oktopod, Sole Azur, Viva Travel,
+    Astra Travel, Hedonic Travel, and others).
+  - `oktopod.ts` — HTML scrape of a price table by property/date/room type,
+    currently mapped only for Greece (the only confirmed page with a
+    structured table — other Oktopod campaigns are PDFs/announcements
+    without parsable data).
+  - `booking.ts`, `airbnb.ts` — **headless browser (Playwright)**. Both
+    sites block plain HTTP requests (Booking immediately returns an AWS WAF
+    JS challenge; Airbnb renders everything client-side), so a real
+    Chromium instance is used (`lib/browser.ts`) that executes JS and reads
+    results from the DOM. Slower than a plain fetch (a few seconds per
+    search) and more sensitive to changes in the source's DOM structure.
+- Each source has its own timeout and fails independently
+  (`Promise.allSettled` in `lib/search.ts`) — if one source goes down, the
+  others keep working. Results without a detailed room breakdown
+  (Booking/Airbnb/lastminuteponude) show a "total" approximation (price ×
+  number of people); Oktopod has an actual room-type table, so it picks the
+  room whose capacity best matches the requested number of people
+  (`lib/rooms.ts`).
 
-## Pokretanje lokalno
+## Running locally
 
 ```bash
 npm install
@@ -40,55 +41,62 @@ npx playwright install chromium
 npm run dev
 ```
 
-Otvori `http://localhost:3000`. `playwright install chromium` je
-jednokratno i preuzima lokalni browser za Booking/Airbnb providere (ne ide u
-produkcijski build — na Vercelu se koristi `@sparticuz/chromium`, vidi ispod).
+Open `http://localhost:3000`. `playwright install chromium` is a one-time
+step that downloads a local browser for the Booking/Airbnb providers (it
+doesn't ship in the production build — Vercel uses `@sparticuz/chromium`,
+see below).
 
-## Environment varijable
+## Environment variables
 
-Kopiraj `.env.example` u `.env.local` ako želiš keširanje:
+Copy `.env.example` to `.env.local` if you want caching:
 
 ```bash
 cp .env.example .env.local
 ```
 
-- `KV_REST_API_URL` / `KV_REST_API_TOKEN` — Upstash Redis REST kredencijali.
-  Na Vercelu: Project → Storage → dodaj Redis (Marketplace) integraciju, ona
-  automatski postavi ove varijable. Bez njih app radi normalno, samo bez keša.
+- `KV_REST_API_URL` / `KV_REST_API_TOKEN` — Upstash Redis REST credentials.
+  On Vercel: Project → Storage → add a Redis (Marketplace) integration, and
+  it sets these automatically. Without them the app works normally, just
+  without caching.
 
-## Deploy na Vercel
+## Deploying to Vercel
 
 ```bash
 npx vercel
 ```
 
-ili poveži repo direktno u Vercel dashboardu. Nakon prvog deploy-a, po želji
-dodaj Redis integraciju za keširanje (Storage tab u projektu).
+or connect the repo directly in the Vercel dashboard. After the first
+deploy, optionally add a Redis integration for caching (Storage tab in the
+project).
 
-**Napomena za Booking/Airbnb (Playwright):**
-- `@sparticuz/chromium` i `playwright-core` su podešeni kao
-  `serverExternalPackages` u `next.config.ts` da im native binarni fajlovi
-  ne budu pokvareni bundlovanjem.
-- `/api/search` i `/search` imaju `maxDuration = 60` (Vercel Hobby dozvoljava
-  do 60s, Pro do 300s) jer headless pretraga ume da potraje.
-- Serverless funkcija treba realno makar 1024MB+ memorije (Vercel podešava
-  automatski, ali ako Booking/Airbnb počnu da timeout-uju u produkciji, prvo
-  proveriti Function Logs — najčešći uzrok je cold start headless browsera).
+**Note for Booking/Airbnb (Playwright):**
+- `@sparticuz/chromium` and `playwright-core` are configured as
+  `serverExternalPackages` in `next.config.ts` so their native binary files
+  don't get mangled by bundling.
+- `/api/search` and `/search` have `maxDuration = 60` (Vercel Hobby allows
+  up to 60s, Pro up to 300s) because headless search can take a while.
+- The serverless function realistically needs at least 1024MB+ of memory
+  (Vercel sets this automatically, but if Booking/Airbnb start timing out
+  in production, check the Function Logs first — the most common cause is
+  a headless browser cold start).
 
-## Dodavanje novog izvora
+## Adding a new source
 
-1. Napravi `lib/providers/novi-izvor.ts` koji implementira `Provider` iz
-   `lib/providers/types.ts` (`search(params) => Promise<Offer[]>`).
-2. Registruj ga u `lib/providers/index.ts`.
-3. Gotovo — orkestracija, keširanje, sortiranje i UI rade automatski za sve
-   registrovane provajdere.
+1. Create `lib/providers/new-source.ts` implementing the `Provider`
+   interface from `lib/providers/types.ts` (`search(params) =>
+   Promise<Offer[]>`).
+2. Register it in `lib/providers/index.ts`.
+3. Done — orchestration, caching, sorting, and the UI work automatically
+   for all registered providers.
 
-## Napomene o krhkosti scrapinga
+## Notes on scraping fragility
 
-Svi izvori zavise od trenutne HTML/DOM strukture sajtova — ako pretraga za
-neki izvor prestane da vraća rezultate, prvi korak je proveriti da li se
-struktura na tom sajtu promenila (selektori su u odgovarajućem
-`lib/providers/*.ts` fajlu, uz komentar gde je šta pronađeno). Booking i
-Airbnb su dodatno osetljivi jer njihova anti-bot zaštita može vremenom da
-postane stroža i počne da blokira i headless browser.
+All sources depend on the current HTML/DOM structure of the sites — if
+search results stop coming back for a given source, the first step is to
+check whether that site's structure changed (selectors live in the
+corresponding `lib/providers/*.ts` file, with a comment noting what was
+found where). Booking and Airbnb are extra sensitive since their anti-bot
+protection can get stricter over time and start blocking the headless
+browser too.
+
 # last_minute
