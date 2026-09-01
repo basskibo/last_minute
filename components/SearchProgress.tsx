@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Loader2, X } from "lucide-react";
+import { useAppPreferences } from "@/components/providers/AppProviders";
 import type { ProviderStatus } from "@/lib/search";
 
 export interface SearchProgressState {
@@ -20,6 +21,7 @@ export const initialSearchProgress: SearchProgressState = {
 };
 
 export default function SearchProgress({ progress }: { progress: SearchProgressState }) {
+  const { t } = useAppPreferences();
   const { totalProviders, completedProviders, offersSoFar, providers, started } = progress;
   const pct =
     totalProviders > 0 ? Math.round((completedProviders / totalProviders) * 100) : 0;
@@ -29,21 +31,22 @@ export default function SearchProgress({ progress }: { progress: SearchProgressS
       <div className="flex items-start gap-3">
         <Loader2 size={18} className="mt-0.5 shrink-0 animate-spin text-primary" />
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-sm font-medium text-theme-muted">
-            Pretražujemo ponude sa agencija…
-          </p>
+          <p className="text-sm font-medium text-theme-muted">{t("progress.searching")}</p>
           {started && totalProviders > 0 ? (
             <p className="text-sm text-theme-muted">
               <span className="font-semibold tabular-nums text-theme">
                 {completedProviders}
               </span>
-              <span> / {totalProviders} agencija</span>
+              <span>
+                {" "}
+                / {totalProviders} {t("progress.agencies")}
+              </span>
               <span className="mx-2 text-theme-subtle">·</span>
               <span className="font-semibold tabular-nums text-primary">{offersSoFar}</span>
-              <span> ponuda</span>
+              <span> {t("progress.offers")}</span>
             </p>
           ) : (
-            <p className="text-sm text-theme-subtle">Pokrećemo pretragu…</p>
+            <p className="text-sm text-theme-subtle">{t("progress.starting")}</p>
           )}
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAppPreferences } from "@/components/providers/AppProviders";
 import type { ProviderStatus } from "@/lib/search";
 
 export default function ProviderFilter({
@@ -10,6 +11,7 @@ export default function ProviderFilter({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useAppPreferences();
 
   const activeRaw = searchParams.get("providers");
   const active = activeRaw ? activeRaw.split(",") : null;
@@ -36,9 +38,9 @@ export default function ProviderFilter({
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="label-caps">Izvori ponuda</p>
+        <p className="label-caps">{t("providers.label")}</p>
         <span className="text-[11px] tabular-nums text-theme-subtle">
-          {activeCount}/{providerStatus.length} aktivno
+          {activeCount}/{providerStatus.length} {t("providers.active")}
         </span>
       </div>
 

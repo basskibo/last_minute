@@ -1,7 +1,6 @@
-import SearchForm from "@/components/SearchForm";
+import SearchEmptyPrompt from "@/components/SearchEmptyPrompt";
 import SearchPageClient from "@/components/SearchPageClient";
 import type { SortOption } from "@/lib/normalize";
-import { Flex } from "@radix-ui/themes";
 
 export const maxDuration = 60;
 
@@ -26,12 +25,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const providerFilter = sp.providers ? sp.providers.split(",") : undefined;
 
   if (!destination) {
-    return (
-      <Flex direction="column" align="center" className="flex-1 px-4 py-16" gap="8">
-        <p className="text-theme-muted">Unesi destinaciju da bi video ponude.</p>
-        <SearchForm defaultAdults={adults} defaultChildren={children} showQuickPicks />
-      </Flex>
-    );
+    return <SearchEmptyPrompt adults={adults} children={children} />;
   }
 
   return (

@@ -3,10 +3,12 @@
 import { useSearchParams } from "next/navigation";
 import SearchProgress, { initialSearchProgress } from "@/components/SearchProgress";
 import SearchPanelSkeleton, { ResultsGridSkeleton } from "@/components/SearchLoading";
+import { useAppPreferences } from "@/components/providers/AppProviders";
 
 /** Fallback dok se server shell učitava — pravi progress preuzima SearchPageClient. */
 export default function SearchLoadingView() {
   const searchParams = useSearchParams();
+  const { t } = useAppPreferences();
   const destination = searchParams.get("destination")?.trim();
 
   if (!destination) {
@@ -22,7 +24,7 @@ export default function SearchLoadingView() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
       <header className="space-y-1">
-        <p className="label-caps">Rezultati pretrage</p>
+        <p className="label-caps">{t("search.resultsLabel")}</p>
         <h1 className="text-2xl font-bold tracking-tight text-theme sm:text-3xl">
           {destination}
         </h1>

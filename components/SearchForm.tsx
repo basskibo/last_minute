@@ -2,6 +2,7 @@
 
 import { LMP_COUNTRIES, LMP_POPULAR_DESTINATIONS } from "@/lib/providers/lmp-countries";
 import { upcomingMonths } from "@/lib/months";
+import { useAppPreferences } from "@/components/providers/AppProviders";
 import { Baby, CalendarDays, MapPin, Search, Users } from "lucide-react";
 import { Badge, Button, Flex, Select, Text, TextField } from "@radix-ui/themes";
 
@@ -24,16 +25,17 @@ export default function SearchForm({
   embedded = false,
   showQuickPicks = false,
 }: SearchFormProps) {
+  const { locale, t } = useAppPreferences();
   const allDestinations = Object.keys(LMP_COUNTRIES).sort((a, b) =>
-    a.localeCompare(b, "sr")
+    a.localeCompare(b, locale === "en" ? "en" : "sr")
   );
-  const months = upcomingMonths();
+  const months = upcomingMonths(8, new Date(), locale);
   const destinations = allDestinations;
 
   const destinationSelect = (
     id: string,
     triggerClass?: string,
-    placeholder = "npr. Grčka"
+    placeholder?: string
   ) => (
     <Select.Root
       name="destination"
@@ -41,7 +43,11 @@ export default function SearchForm({
       required
       size="3"
     >
-      <Select.Trigger id={id} placeholder={placeholder} className={triggerClass ?? "w-full"} />
+      <Select.Trigger
+        id={id}
+        placeholder={placeholder ?? t("search.destinationPlaceholder")}
+        className={triggerClass ?? "w-full"}
+      />
       <Select.Content>
         {destinations.map((name) => (
           <Select.Item key={name} value={name}>
@@ -69,7 +75,7 @@ export default function SearchForm({
               className="flex items-center gap-1.5 text-[--gray-11]"
             >
               <MapPin size={14} className="text-[--accent-9]" />
-              Destinacija
+              {t("search.destination")}
             </Text>
             {destinationSelect("destination")}
           </Flex>
@@ -82,12 +88,12 @@ export default function SearchForm({
               className="flex items-center gap-1.5 text-[--gray-11]"
             >
               <CalendarDays size={14} className="text-[--accent-9]" />
-              Period (mesec)
+              {t("search.period")}
             </Text>
             <Select.Root name="month" defaultValue={defaultMonth || "any"} size="3">
               <Select.Trigger className="w-full" />
               <Select.Content>
-                <Select.Item value="any">Svejedno</Select.Item>
+                <Select.Item value="any">{t("search.monthAny")}</Select.Item>
                 {months.map((m) => (
                   <Select.Item key={m.value} value={m.value}>
                     {m.label}
@@ -106,7 +112,7 @@ export default function SearchForm({
               className="flex items-center gap-1.5 text-[--gray-11]"
             >
               <Users size={14} className="text-[--accent-9]" />
-              Odrasli
+              {t("search.adults")}
             </Text>
             <TextField.Root
               id="adults"
@@ -128,7 +134,7 @@ export default function SearchForm({
               className="flex items-center gap-1.5 text-[--gray-11]"
             >
               <Baby size={14} className="text-[--accent-9]" />
-              Deca
+              {t("search.children")}
             </Text>
             <TextField.Root
               id="children"
@@ -143,16 +149,12 @@ export default function SearchForm({
         </Flex>
 
         <Flex mt="4" gap="2" align="center" wrap="wrap">
-          <Button
-            type="submit"
-            size="3"
-            className="!cursor-pointer btn-brand"
-          >
+          <Button type="submit" size="3" className="!cursor-pointer btn-brand">
             <Search size={16} />
-            Pretraži ponude
+            {t("search.submitHero")}
           </Button>
           <Text size="2" color="gray">
-            ili probaj:
+            {t("search.orTry")}
           </Text>
           {LMP_POPULAR_DESTINATIONS.map((d) => (
             <a
@@ -188,19 +190,17 @@ export default function SearchForm({
             className="flex items-center gap-1.5 label-caps"
           >
             <MapPin size={13} className="text-primary" />
-            Destinacija
+            {t("search.destination")}
           </label>
           {destinationSelect("destination-bar", `w-full ${fieldClass}`)}
         </div>
 
         <div className="space-y-1.5 sm:w-36">
-          <span className="label-caps">
-            Period
-          </span>
+          <span className="label-caps">{t("search.periodShort")}</span>
           <Select.Root name="month" defaultValue={defaultMonth || "any"} size="3">
             <Select.Trigger className={`w-full ${fieldClass}`} />
             <Select.Content>
-              <Select.Item value="any">Svejedno</Select.Item>
+              <Select.Item value="any">{t("search.monthAny")}</Select.Item>
               {months.map((m) => (
                 <Select.Item key={m.value} value={m.value}>
                   {m.label}
@@ -211,11 +211,8 @@ export default function SearchForm({
         </div>
 
         <div className="space-y-1.5 sm:w-20">
-          <label
-            htmlFor="adults-bar"
-            className="label-caps"
-          >
-            Odrasli
+          <label htmlFor="adults-bar" className="label-caps">
+            {t("search.adults")}
           </label>
           <TextField.Root
             id="adults-bar"
@@ -234,11 +231,8 @@ export default function SearchForm({
         </div>
 
         <div className="space-y-1.5 sm:w-20">
-          <label
-            htmlFor="children-bar"
-            className="label-caps"
-          >
-            Deca
+          <label htmlFor="children-bar" className="label-caps">
+            {t("search.children")}
           </label>
           <TextField.Root
             id="children-bar"
@@ -262,13 +256,13 @@ export default function SearchForm({
           className="!w-full btn-brand-solid sm:!w-auto sm:min-w-[7.5rem]"
         >
           <Search size={16} />
-          Pretraži
+          {t("search.submit")}
         </Button>
       </div>
 
       {showQuickPicks && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border-muted)] pt-3">
-          <span className="label-caps">Brzo:</span>
+          <span className="label-caps">{t("search.quick")}</span>
           {LMP_POPULAR_DESTINATIONS.map((d) => (
             <a
               key={d}

@@ -1,7 +1,9 @@
+import HomeHero from "@/components/HomeHero";
+import { AppProviders } from "@/components/providers/AppProviders";
 import SiteHeader from "@/components/SiteHeader";
+import ThemeInitScript from "@/components/ThemeInitScript";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Theme } from "@radix-ui/themes";
 import "@radix-ui/themes/styles.css";
 import "./globals.css";
 
@@ -22,7 +24,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -32,18 +37,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <ThemeInitScript />
+      </head>
       <body className="min-h-full flex flex-col">
-        <Theme
-          appearance="dark"
-          accentColor="teal"
-          grayColor="slate"
-          radius="large"
-          panelBackground="solid"
-          className="min-h-full flex flex-col flex-1"
-        >
+        <AppProviders>
           <SiteHeader />
           {children}
-        </Theme>
+        </AppProviders>
       </body>
     </html>
   );

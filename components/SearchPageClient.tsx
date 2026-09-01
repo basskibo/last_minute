@@ -9,6 +9,8 @@ import SearchProgress, {
   type SearchProgressState,
 } from "@/components/SearchProgress";
 import SearchPanelSkeleton, { ResultsGridSkeleton } from "@/components/SearchLoading";
+import { useAppPreferences } from "@/components/providers/AppProviders";
+import { formatGuests } from "@/lib/i18n/messages";
 import type { SearchResult } from "@/lib/search";
 import type { SortOption } from "@/lib/normalize";
 import { Callout } from "@radix-ui/themes";
@@ -31,11 +33,14 @@ export default function SearchPageClient({
   sort,
   providerFilter,
 }: SearchPageClientProps) {
+  const { locale, t } = useAppPreferences();
   const people = adults + children;
   const [progress, setProgress] = useState<SearchProgressState>(initialSearchProgress);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const completedRef = useRef(false);
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
@@ -104,13 +109,15 @@ export default function SearchPageClient({
 
     source.onerror = () => {
       if (!completedRef.current) {
-        setFetchError("Pretraga nije uspela — probaj ponovo.");
+        setFetchError(tRef.current("search.fetchError"));
       }
       source.close();
     };
 
     return () => source.close();
   }, [queryString]);
+
+  const guestSummary = formatGuests(adults, children, locale);
 
   if (fetchError) {
     return (
@@ -133,15 +140,14 @@ export default function SearchPageClient({
     return (
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <header className="space-y-1">
-          <p className="label-caps">Rezultati pretrage</p>
+          <p className="label-caps">{t("search.resultsLabel")}</p>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-theme sm:text-3xl">
               {destination}
             </h1>
             <p className="chip-inactive !inline-flex items-center gap-1.5 !py-1">
               <Users size={13} className="text-primary" />
-              {adults} odrasl{adults === 1 ? "a" : "ih"}
-              {children > 0 && ` · ${children} dete${children === 1 ? "" : "ta"}`}
+              {guestSummary}
             </p>
           </div>
         </header>
@@ -156,15 +162,14 @@ export default function SearchPageClient({
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
       <header className="space-y-1">
-        <p className="label-caps">Rezultati pretrage</p>
+        <p className="label-caps">{t("search.resultsLabel")}</p>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-theme sm:text-3xl">
             {destination}
           </h1>
           <p className="chip-inactive !inline-flex items-center gap-1.5 !py-1">
             <Users size={13} className="text-primary" />
-            {adults} odrasl{adults === 1 ? "a" : "ih"}
-            {children > 0 && ` · ${children} dete${children === 1 ? "" : "ta"}`}
+            {guestSummary}
           </p>
         </div>
       </header>
@@ -184,8 +189,9 @@ export default function SearchPageClient({
             <AlertTriangle size={16} />
           </Callout.Icon>
           <Callout.Text>
-            Neki izvori trenutno nisu dostupni ({result.errors.map((e) => e.provider).join(", ")})
-            — prikazani su rezultati iz ostalih izvora.
+            {t("search.sourcesPartial", {
+              sources: result.errors.map((e) => e.provider).join(", "),
+            })}
           </Callout.Text>
         </Callout.Root>
       )}
@@ -195,10 +201,7 @@ export default function SearchPageClient({
           <Callout.Icon>
             <Info size={16} />
           </Callout.Icon>
-          <Callout.Text>
-            Izabrani mesec služi kao orijentir — ponude koje ga pominju su na vrhu, ali
-            prikazujemo i ostale jer se last minute termini stalno menjaju.
-          </Callout.Text>
+          <Callout.Text>{t("search.monthHint")}</Callout.Text>
         </Callout.Root>
       )}
 

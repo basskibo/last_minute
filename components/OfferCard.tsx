@@ -1,19 +1,21 @@
+"use client";
+
 import type { Offer } from "@/lib/providers/types";
 import { getProviderLogo } from "@/lib/provider-logos";
 import { pickBestRoom } from "@/lib/rooms";
+import { useAppPreferences } from "@/components/providers/AppProviders";
+import { peopleWord, type MessageKey } from "@/lib/i18n/messages";
 import { Bus, CalendarDays, Car, MapPin } from "lucide-react";
 
-const TRANSPORT_LABEL: Record<string, string> = {
-  avion: "Avion",
-  autobus: "Autobus",
-  sopstveni: "Sopstveni prevoz",
-  nepoznato: "",
+const TRANSPORT_KEYS: Record<string, MessageKey> = {
+  avion: "offer.transport.avion",
+  autobus: "offer.transport.autobus",
+  sopstveni: "offer.transport.sopstveni",
 };
 
-const ACCOMMODATION_LABEL: Record<string, string> = {
-  hotel: "Hotel",
-  apartman: "Apartman",
-  nepoznato: "",
+const ACCOMMODATION_KEYS: Record<string, MessageKey> = {
+  hotel: "offer.accommodation.hotel",
+  apartman: "offer.accommodation.apartman",
 };
 
 const MAX_ROOM_ROWS = 3;
@@ -25,20 +27,17 @@ function discountPercent(offer: Offer): number | null {
   return pct > 0 ? Math.round(pct) : null;
 }
 
-function peopleWord(n: number): string {
-  if (n === 1) return "osoba";
-  if (n >= 2 && n <= 4) return "osobe";
-  return "osoba";
-}
-
 const euro = (n: number) => Math.round(n);
 
 export default function OfferCard({ offer, people }: { offer: Offer; people: number }) {
+  const { locale, t } = useAppPreferences();
   const discount = discountPercent(offer);
 
   const tags = [
-    ...offer.transport.map((t) => TRANSPORT_LABEL[t]).filter(Boolean),
-    ...offer.accommodation.map((a) => ACCOMMODATION_LABEL[a]).filter(Boolean),
+    ...offer.transport.map((tr) => TRANSPORT_KEYS[tr] && t(TRANSPORT_KEYS[tr])).filter(Boolean),
+    ...offer.accommodation
+      .map((a) => ACCOMMODATION_KEYS[a] && t(ACCOMMODATION_KEYS[a]))
+      .filter(Boolean),
   ];
 
   const bestRoom = offer.roomOptions?.length ? pickBestRoom(offer.roomOptions, people) : null;
@@ -84,11 +83,11 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
           )}
 
           {!isAgencyLogo && (
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg)]/60 via-transparent to-transparent" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090b]/75 via-transparent to-transparent" />
           )}
 
           {discount != null && (
-            <span className="absolute left-3 top-3 rounded-md bg-success px-2 py-0.5 text-[11px] font-bold text-[var(--primary-fg)] shadow-sm">
+            <span className="absolute left-3 top-3 rounded-md bg-[color-mix(in_srgb,var(--success)_85%,#166534)] px-2 py-0.5 text-[11px] font-bold text-[var(--primary-fg)]">
               −{discount}%
             </span>
           )}
@@ -112,19 +111,19 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                 </p>
               )}
               {offer.dateRange && (
-                <p className="flex items-center gap-1.5 text-xs text-theme-muted">
+                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-theme-muted">
                   <CalendarDays size={12} className="shrink-0 text-primary" />
-                  <span className="line-clamp-1">
-                    {offer.dateRange}
-                    {offer.nights ? ` · ${offer.nights}` : ""}
-                  </span>
+                  <span>{offer.dateRange}</span>
+                  {offer.nights && (
+                    <span className="nights-badge">{offer.nights}</span>
+                  )}
                 </p>
               )}
               {tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {tags.map((t) => (
-                    <span key={t} className="tag-brand">
-                      {t}
+                  {tags.map((tag) => (
+                    <span key={tag} className="tag-brand">
+                      {tag}
                     </span>
                   ))}
                 </div>
@@ -148,10 +147,18 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                   <span className="line-clamp-1 flex-1 text-xs text-theme-muted">{r.label}</span>
                   <div className="flex shrink-0 items-center gap-2">
                     {r.transportIncluded === true && (
-                      <Bus size={12} className="text-primary" aria-label="Prevoz uključen" />
+                      <Bus
+                        size={12}
+                        className="text-primary"
+                        aria-label={t("offer.transportIncluded")}
+                      />
                     )}
                     {r.transportIncluded === false && (
-                      <Car size={12} className="text-theme-subtle" aria-label="Sopstveni prevoz" />
+                      <Car
+                        size={12}
+                        className="text-theme-subtle"
+                        aria-label={t("offer.ownTransport")}
+                      />
                     )}
                     <span className="text-xs font-semibold tabular-nums text-theme">
                       {euro(r.price)} €
@@ -161,7 +168,7 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
               ))}
               {hiddenRoomCount > 0 && (
                 <p className="px-3 py-1.5 text-[11px] text-theme-subtle">
-                  +{hiddenRoomCount} još soba na sajtu
+                  {t("offer.moreRooms", { count: hiddenRoomCount })}
                 </p>
               )}
             </div>
@@ -173,29 +180,34 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                 <div>
                   {offer.oldPricePerPerson && headlinePerPerson != null && (
                     <p className="text-xs tabular-nums text-theme-subtle line-through">
-                      {euro(offer.oldPricePerPerson)} € / osobi
+                      {euro(offer.oldPricePerPerson)} € {t("offer.perPerson")}
                     </p>
                   )}
                   <p className="text-sm font-medium tabular-nums text-theme-muted">
                     {headlinePerPerson != null ? euro(headlinePerPerson) : "?"} €
-                    <span className="font-normal text-theme-subtle"> / osobi</span>
+                    <span className="font-normal text-theme-subtle"> {t("offer.perPerson")}</span>
                   </p>
                   <p className="mt-0.5 text-xs text-theme-subtle">
-                    ukupno za {headlineCapacity} {peopleWord(headlineCapacity)}
+                    {t("offer.totalFor", {
+                      count: headlineCapacity,
+                      people: peopleWord(headlineCapacity, locale),
+                    })}
                   </p>
                 </div>
-                <p className="text-gradient-price text-2xl font-bold tabular-nums tracking-tight">
+                <p className="text-2xl font-bold tabular-nums tracking-tight text-gradient-price">
                   {headlineTotal} €
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-theme-muted">Cena na upit</p>
+              <p className="text-sm text-theme-muted">{t("offer.priceOnRequest")}</p>
             )}
 
             {bestRoom && !bestRoom.fits && bestRoom.capacity != null && (
               <p className="mt-2 text-xs leading-snug text-warning">
-                Najveća soba: {bestRoom.capacity} {peopleWord(bestRoom.capacity)} — manje od
-                traženog.
+                {t("offer.roomTooSmall", {
+                  capacity: bestRoom.capacity,
+                  people: peopleWord(bestRoom.capacity, locale),
+                })}
               </p>
             )}
           </div>

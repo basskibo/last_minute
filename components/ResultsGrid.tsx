@@ -1,18 +1,21 @@
+"use client";
+
 import type { Offer } from "@/lib/providers/types";
 import OfferCard from "./OfferCard";
+import { useAppPreferences } from "@/components/providers/AppProviders";
 import { SearchX } from "lucide-react";
 
 export default function ResultsGrid({ offers, people }: { offers: Offer[]; people: number }) {
+  const { t } = useAppPreferences();
+
   if (offers.length === 0) {
     return (
       <div className="flex flex-col items-center py-16 text-center text-theme-subtle">
         <div className="mb-3 rounded-full border border-[var(--border)] surface-card p-3">
           <SearchX size={22} className="text-theme-subtle" />
         </div>
-        <p className="text-lg font-medium text-theme-muted">Nema pronađenih ponuda za ovu pretragu.</p>
-        <p className="mt-1 text-sm">
-          Probaj drugu destinaciju ili širi period — last minute ponude se često menjaju.
-        </p>
+        <p className="text-lg font-medium text-theme-muted">{t("results.emptyTitle")}</p>
+        <p className="mt-1 text-sm">{t("results.emptyHint")}</p>
       </div>
     );
   }
