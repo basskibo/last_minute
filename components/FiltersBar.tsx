@@ -24,16 +24,16 @@ export default function FiltersBar({ resultCount }: { resultCount: number }) {
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm text-slate-400">
-        <span className="text-lg font-bold tabular-nums text-white">{resultCount}</span>
+      <p className="text-sm text-theme-muted">
+        <span className="text-lg font-bold tabular-nums text-theme">{resultCount}</span>
         <span className="ml-1.5">ponuda</span>
       </p>
 
       <div className="flex items-center gap-2">
-        <ArrowUpDown size={14} className="text-slate-500" aria-hidden />
+        <ArrowUpDown size={14} className="text-theme-subtle" aria-hidden />
         <Select.Root value={currentSort} onValueChange={handleSortChange} size="2">
           <Select.Trigger
-            className="!min-w-[9rem] !bg-slate-800/60 !border-white/[0.08] !text-slate-300"
+            className="field-theme !min-w-[9rem] !text-theme-muted"
             aria-label={`Sortiraj: ${currentLabel}`}
           />
           <Select.Content>

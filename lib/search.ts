@@ -29,68 +29,142 @@ export interface SearchResult {
   providerStatus: ProviderStatus[];
 }
 
-/**
- * providerFilter utiče samo na PRIKAZ (koji izvori se vrate u offers), ne na
- * to koji izvori se zapravo pretražuju/keširaju — keš uvek sadrži rezultate
- * svih izvora za tu destinaciju, tako da promena filtera ne pokreće ponovo
- * spor headless-browser scraping za Booking/Airbnb.
- */
-export async function performSearch(
+export interface SearchProgressEvent {
+  type: "start" | "provider" | "complete";
+  totalProviders: number;
+  completedProviders?: number;
+  offersSoFar?: number;
+  provider?: ProviderStatus & { failed?: boolean };
+  result?: SearchResult;
+}
+
+function finalizeSearchResult(
   params: SearchParams,
-  sort: SortOption = "price-asc",
-  providerFilter?: string[]
-): Promise<SearchResult> {
-  const cacheKey = buildCacheKey(params);
-  const cached = await getCached<CachedPayload>(cacheKey);
-  if (cached) {
-    const filtered =
-      providerFilter && providerFilter.length > 0
-        ? cached.offers.filter((o) => providerFilter.includes(o.provider))
-        : cached.offers;
-    const offers = prioritizeMonth(sortOffers(filtered, sort), params.month);
-    return { offers, cached: true, errors: [], providerStatus: cached.providerStatus };
-  }
-
-  const settled = await Promise.allSettled(
-    providers.map((p) => withTimeout(p.search(params), p.timeoutMs ?? 8000))
-  );
-
-  const perProviderResults: Offer[][] = [];
-  const errors: { provider: string; message: string }[] = [];
-  const providerStatus: ProviderStatus[] = [];
-
-  settled.forEach((result, i) => {
-    const provider = providers[i];
-    if (result.status === "fulfilled") {
-      perProviderResults.push(result.value);
-      providerStatus.push({
-        id: provider.id,
-        label: provider.label,
-        count: result.value.length,
-        note: provider.note,
-      });
-    } else {
-      perProviderResults.push([]);
-      errors.push({
-        provider: provider.id,
-        message: String((result.reason as Error)?.message ?? result.reason),
-      });
-      providerStatus.push({
-        id: provider.id,
-        label: provider.label,
-        count: 0,
-        note: provider.note,
-      });
-    }
-  });
-
-  const merged = mergeOffers(perProviderResults);
-  await setCached<CachedPayload>(cacheKey, { offers: merged, providerStatus });
-
+  sort: SortOption,
+  providerFilter: string[] | undefined,
+  merged: Offer[],
+  providerStatus: ProviderStatus[],
+  errors: SearchResult["errors"],
+  cached: boolean
+): SearchResult {
   const filtered =
     providerFilter && providerFilter.length > 0
       ? merged.filter((o) => providerFilter.includes(o.provider))
       : merged;
   const offers = prioritizeMonth(sortOffers(filtered, sort), params.month);
-  return { offers, cached: false, errors, providerStatus };
+  return { offers, cached, errors, providerStatus };
+}
+
+export async function performSearch(
+  params: SearchParams,
+  sort: SortOption = "price-asc",
+  providerFilter?: string[]
+): Promise<SearchResult> {
+  return performSearchStreaming(params, sort, providerFilter, () => {});
+}
+
+export async function performSearchStreaming(
+  params: SearchParams,
+  sort: SortOption = "price-asc",
+  providerFilter: string[] | undefined,
+  emit: (event: SearchProgressEvent) => void
+): Promise<SearchResult> {
+  const totalProviders = providers.length;
+  emit({ type: "start", totalProviders });
+
+  const cacheKey = buildCacheKey(params);
+  const cached = await getCached<CachedPayload>(cacheKey);
+  if (cached) {
+    let offersSoFar = 0;
+    cached.providerStatus.forEach((provider, i) => {
+      offersSoFar += provider.count;
+      emit({
+        type: "provider",
+        totalProviders,
+        completedProviders: i + 1,
+        offersSoFar,
+        provider,
+      });
+    });
+
+    const result = finalizeSearchResult(
+      params,
+      sort,
+      providerFilter,
+      cached.offers,
+      cached.providerStatus,
+      [],
+      true
+    );
+    emit({ type: "complete", totalProviders, result });
+    return result;
+  }
+
+  const perProviderResults: Offer[][] = new Array(totalProviders);
+  const errors: SearchResult["errors"] = [];
+  const providerStatus: ProviderStatus[] = new Array(totalProviders);
+  let completedProviders = 0;
+  let offersSoFar = 0;
+
+  await Promise.all(
+    providers.map((provider, index) =>
+      withTimeout(provider.search(params), provider.timeoutMs ?? 8000)
+        .then((offers) => {
+          perProviderResults[index] = offers;
+          const status: ProviderStatus = {
+            id: provider.id,
+            label: provider.label,
+            count: offers.length,
+            note: provider.note,
+          };
+          providerStatus[index] = status;
+          completedProviders++;
+          offersSoFar += offers.length;
+          emit({
+            type: "provider",
+            totalProviders,
+            completedProviders,
+            offersSoFar,
+            provider: status,
+          });
+        })
+        .catch((reason) => {
+          perProviderResults[index] = [];
+          errors.push({
+            provider: provider.id,
+            message: String((reason as Error)?.message ?? reason),
+          });
+          const status: ProviderStatus = {
+            id: provider.id,
+            label: provider.label,
+            count: 0,
+            note: provider.note,
+          };
+          providerStatus[index] = status;
+          completedProviders++;
+          emit({
+            type: "provider",
+            totalProviders,
+            completedProviders,
+            offersSoFar,
+            provider: { ...status, failed: true },
+          });
+        })
+    )
+  );
+
+  const merged = mergeOffers(perProviderResults);
+  await setCached<CachedPayload>(cacheKey, { offers: merged, providerStatus });
+
+  const result = finalizeSearchResult(
+    params,
+    sort,
+    providerFilter,
+    merged,
+    providerStatus,
+    errors,
+    false
+  );
+  emit({ type: "complete", totalProviders, result });
+  return result;
 }

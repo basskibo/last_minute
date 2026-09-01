@@ -1,10 +1,7 @@
 import SearchForm from "@/components/SearchForm";
-import SearchPanel from "@/components/SearchPanel";
-import ResultsGrid from "@/components/ResultsGrid";
-import { performSearch } from "@/lib/search";
+import SearchPageClient from "@/components/SearchPageClient";
 import type { SortOption } from "@/lib/normalize";
-import { Callout, Flex } from "@radix-ui/themes";
-import { AlertTriangle, Info, Users } from "lucide-react";
+import { Flex } from "@radix-ui/themes";
 
 export const maxDuration = 60;
 
@@ -24,7 +21,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const destination = sp.destination?.trim() ?? "";
   const adults = sp.adults ? parseInt(sp.adults, 10) || 2 : 2;
   const children = sp.children ? parseInt(sp.children, 10) || 0 : 0;
-  const people = adults + children;
   const sort = (sp.sort as SortOption) || "price-asc";
   const month = sp.month && sp.month !== "any" ? sp.month : undefined;
   const providerFilter = sp.providers ? sp.providers.split(",") : undefined;
@@ -32,70 +28,20 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   if (!destination) {
     return (
       <Flex direction="column" align="center" className="flex-1 px-4 py-16" gap="8">
-        <p className="text-slate-400">Unesi destinaciju da bi video ponude.</p>
+        <p className="text-theme-muted">Unesi destinaciju da bi video ponude.</p>
         <SearchForm defaultAdults={adults} defaultChildren={children} showQuickPicks />
       </Flex>
     );
   }
 
-  const { offers, errors, providerStatus } = await performSearch(
-    { destination, month, adults, children },
-    sort,
-    providerFilter
-  );
-
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-      <header className="space-y-1">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-          Rezultati pretrage
-        </p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            {destination}
-          </h1>
-          <p className="flex items-center gap-1.5 rounded-full bg-slate-800/60 px-3 py-1 text-xs font-medium text-slate-400 ring-1 ring-white/[0.06]">
-            <Users size={13} className="text-sky-400/80" />
-            {adults} odrasl{adults === 1 ? "a" : "ih"}
-            {children > 0 && ` · ${children} dete${children === 1 ? "" : "ta"}`}
-          </p>
-        </div>
-      </header>
-
-      <SearchPanel
-        destination={destination}
-        month={month}
-        adults={adults}
-        children={children}
-        providerStatus={providerStatus}
-        resultCount={offers.length}
-      />
-
-      {errors.length > 0 && (
-        <Callout.Root color="amber" variant="soft" className="!rounded-xl">
-          <Callout.Icon>
-            <AlertTriangle size={16} />
-          </Callout.Icon>
-          <Callout.Text>
-            Neki izvori trenutno nisu dostupni ({errors.map((e) => e.provider).join(", ")}) —
-            prikazani su rezultati iz ostalih izvora.
-          </Callout.Text>
-        </Callout.Root>
-      )}
-
-      {month && (
-        <Callout.Root color="gray" variant="soft" className="!rounded-xl">
-          <Callout.Icon>
-            <Info size={16} />
-          </Callout.Icon>
-          <Callout.Text>
-            Izabrani mesec služi kao orijentir — ponude koje ga pominju su na vrhu, ali
-            prikazujemo i ostale jer se last minute termini stalno menjaju.
-          </Callout.Text>
-        </Callout.Root>
-      )}
-
-      <ResultsGrid offers={offers} people={people} />
-    </div>
+    <SearchPageClient
+      destination={destination}
+      month={month}
+      adults={adults}
+      children={children}
+      sort={sort}
+      providerFilter={providerFilter}
+    />
   );
 }

@@ -33,11 +33,11 @@ export default function SearchPanel({
         />
       </div>
 
-      <div className="border-t border-white/[0.06] px-4 py-4 sm:px-5">
+      <div className="border-t border-[var(--border-muted)] px-4 py-4 sm:px-5">
         <ProviderFilter providerStatus={providerStatus} />
       </div>
 
-      <div className="border-t border-white/[0.06] bg-slate-900/30 px-4 py-3 sm:px-5">
+      <div className="border-t border-[var(--border-muted)] bg-[color-mix(in_srgb,var(--surface)_30%,transparent)] px-4 py-3 sm:px-5">
         <FiltersBar resultCount={resultCount} />
       </div>
     </section>

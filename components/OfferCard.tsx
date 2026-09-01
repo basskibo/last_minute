@@ -1,8 +1,7 @@
 import type { Offer } from "@/lib/providers/types";
 import { getProviderLogo } from "@/lib/provider-logos";
 import { pickBestRoom } from "@/lib/rooms";
-import { Bus, Car, CalendarDays, MapPin, Users } from "lucide-react";
-import { Badge, Box, Card, Flex, Heading, Text } from "@radix-ui/themes";
+import { Bus, CalendarDays, Car, MapPin } from "lucide-react";
 
 const TRANSPORT_LABEL: Record<string, string> = {
   avion: "Avion",
@@ -13,9 +12,11 @@ const TRANSPORT_LABEL: Record<string, string> = {
 
 const ACCOMMODATION_LABEL: Record<string, string> = {
   hotel: "Hotel",
-  apartman: "Apartman/Studio",
+  apartman: "Apartman",
   nepoznato: "",
 };
+
+const MAX_ROOM_ROWS = 3;
 
 function discountPercent(offer: Offer): number | null {
   if (!offer.oldPricePerPerson || !offer.pricePerPerson) return null;
@@ -52,14 +53,19 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
     offer.location &&
     offer.location.trim().toLowerCase() !== offer.title.trim().toLowerCase();
 
+  const roomOptions = offer.roomOptions ?? [];
+  const visibleRooms = roomOptions.slice(0, MAX_ROOM_ROWS);
+  const hiddenRoomCount = roomOptions.length - visibleRooms.length;
+
   return (
-    <Card
-      asChild
-      size="2"
-      className="group !p-0 overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40"
-    >
-      <a href={offer.sourceUrl} target="_blank" rel="noopener noreferrer">
-        <Box className="relative aspect-[5/4] overflow-hidden bg-[--gray-3] sm:aspect-[4/3]">
+    <article className="offer-card group">
+      <a
+        href={offer.sourceUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex h-full min-h-0 flex-col"
+      >
+        <div className="relative h-44 shrink-0 overflow-hidden surface-muted">
           {coverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -67,171 +73,134 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
               alt={isAgencyLogo ? offer.sourceLabel : offer.title}
               className={
                 isAgencyLogo
-                  ? "h-full w-full bg-slate-100 object-contain p-6 dark:bg-slate-200"
-                  : "h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  ? "h-full w-full bg-zinc-100 object-contain p-7"
+                  : "h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
               }
             />
           ) : (
-            <Flex
-              align="center"
-              justify="center"
-              className="h-full w-full bg-gradient-to-br from-[--gray-a3] to-[--accent-a3]"
-            >
-              <Text size="2" weight="medium" color="gray" className="px-4 text-center">
-                {offer.sourceLabel}
-              </Text>
-            </Flex>
+            <div className="flex h-full items-center justify-center">
+              <span className="text-sm text-theme-muted">{offer.sourceLabel}</span>
+            </div>
+          )}
+
+          {!isAgencyLogo && (
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg)]/60 via-transparent to-transparent" />
           )}
 
           {discount != null && (
-            <Badge
-              color="ruby"
-              variant="solid"
-              radius="full"
-              className="absolute left-2.5 top-2.5 shadow-sm"
-            >
-              -{discount}%
-            </Badge>
+            <span className="absolute left-3 top-3 rounded-md bg-success px-2 py-0.5 text-[11px] font-bold text-[var(--primary-fg)] shadow-sm">
+              −{discount}%
+            </span>
           )}
 
-          <Badge
-            color="gray"
-            variant="solid"
-            highContrast
-            radius="full"
-            className="absolute right-2.5 top-2.5 shadow-sm"
-          >
+          <span className="absolute bottom-3 left-3 max-w-[70%] truncate rounded-md border border-[var(--border)] bg-[var(--surface-overlay)] px-2 py-0.5 text-[11px] font-medium text-theme backdrop-blur-sm">
             {offer.sourceLabel}
-          </Badge>
-        </Box>
+          </span>
+        </div>
 
-        <Box p="4">
-          <Heading size="3" className="line-clamp-2 leading-snug">
-            {offer.title}
-          </Heading>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+          <div className="min-h-[5.5rem] space-y-2">
+            <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight text-theme">
+              {offer.title}
+            </h3>
 
-          {(showLocation || offer.dateRange) && (
-            <Flex direction="column" gap="1" mt="1.5">
+            <div className="space-y-1.5">
               {showLocation && (
-                <Flex align="center" gap="2">
-                  <MapPin size={13} className="shrink-0 text-[--accent-9]" />
-                  <Text size="2" color="gray" className="line-clamp-1">
-                    {offer.location}
-                  </Text>
-                </Flex>
+                <p className="flex items-center gap-1.5 text-xs text-theme-muted">
+                  <MapPin size={12} className="shrink-0 text-primary" />
+                  <span className="line-clamp-1">{offer.location}</span>
+                </p>
               )}
               {offer.dateRange && (
-                <Flex align="center" gap="2">
-                  <CalendarDays size={13} className="shrink-0 text-[--accent-9]" />
-                  <Text size="2" color="gray">
+                <p className="flex items-center gap-1.5 text-xs text-theme-muted">
+                  <CalendarDays size={12} className="shrink-0 text-primary" />
+                  <span className="line-clamp-1">
                     {offer.dateRange}
                     {offer.nights ? ` · ${offer.nights}` : ""}
-                  </Text>
-                </Flex>
+                  </span>
+                </p>
               )}
-            </Flex>
-          )}
-
-          {tags.length > 0 && (
-            <Flex gap="1" wrap="wrap" mt="2">
-              {tags.map((t) => (
-                <Badge key={t} color="gray" variant="soft" radius="full">
-                  {t}
-                </Badge>
-              ))}
-            </Flex>
-          )}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {tags.map((t) => (
+                    <span key={t} className="tag-brand">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
           {offer.description && (
-            <Text as="p" size="2" color="gray" mt="2" className="line-clamp-2">
+            <p className="line-clamp-2 text-xs leading-relaxed text-theme-subtle">
               {offer.description}
-            </Text>
+            </p>
           )}
 
-          {offer.roomOptions && offer.roomOptions.length > 0 && (
-            <Box mt="2" className="overflow-hidden rounded-lg bg-[--gray-a3]">
-              {offer.roomOptions.map((r, i) => (
-                <Flex
+          {visibleRooms.length > 0 && (
+            <div className="divide-y divide-[var(--border-muted)] overflow-hidden rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-muted)_40%,transparent)]">
+              {visibleRooms.map((r) => (
+                <div
                   key={r.label}
-                  align="center"
-                  justify="between"
-                  px="3"
-                  py="2"
-                  className={i !== 0 ? "border-t border-[--gray-a5]" : ""}
+                  className="flex items-center justify-between gap-2 px-3 py-2"
                 >
-                  <Text size="2" color="gray" className="line-clamp-1 flex-1">
-                    {r.label}
-                  </Text>
-                  <Flex align="center" gap="2" className="shrink-0">
+                  <span className="line-clamp-1 flex-1 text-xs text-theme-muted">{r.label}</span>
+                  <div className="flex shrink-0 items-center gap-2">
                     {r.transportIncluded === true && (
-                      <Bus size={13} className="text-[--accent-9]" aria-label="Prevoz uključen" />
+                      <Bus size={12} className="text-primary" aria-label="Prevoz uključen" />
                     )}
                     {r.transportIncluded === false && (
-                      <Car size={13} className="text-[--gray-9]" aria-label="Sopstveni prevoz" />
+                      <Car size={12} className="text-theme-subtle" aria-label="Sopstveni prevoz" />
                     )}
-                    <Text size="2" weight="medium">
+                    <span className="text-xs font-semibold tabular-nums text-theme">
                       {euro(r.price)} €
-                    </Text>
-                  </Flex>
-                </Flex>
+                    </span>
+                  </div>
+                </div>
               ))}
-            </Box>
+              {hiddenRoomCount > 0 && (
+                <p className="px-3 py-1.5 text-[11px] text-theme-subtle">
+                  +{hiddenRoomCount} još soba na sajtu
+                </p>
+              )}
+            </div>
           )}
 
-          <Box mt="3">
+          <div className="mt-auto border-t border-[var(--border)] pt-3">
             {headlineTotal != null ? (
-              <Flex
-                align="center"
-                justify="between"
-                gap="2"
-                p="3"
-                className="rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-950/25"
-              >
-                <Box>
-                  <Text
-                    as="p"
-                    size="1"
-                    weight="bold"
-                    className="uppercase tracking-wide text-sky-100/90"
-                  >
-                    Ukupno za grupu
-                  </Text>
-                  <Text as="p" size="6" weight="bold" className="tabular-nums">
-                    {headlineTotal} €
-                  </Text>
-                </Box>
-                <Box className="text-right">
-                  <Flex align="center" gap="1" justify="end">
-                    <Users size={12} />
-                    <Text size="1">
-                      {headlineCapacity} {peopleWord(headlineCapacity)}
-                    </Text>
-                  </Flex>
-                  <Text as="p" size="1" className="tabular-nums">
-                    {offer.oldPricePerPerson && (
-                      <span className="mr-1 line-through opacity-60">
-                        {euro(offer.oldPricePerPerson)} €
-                      </span>
-                    )}
-                    {headlinePerPerson != null ? euro(headlinePerPerson) : "?"} €/osobi
-                  </Text>
-                </Box>
-              </Flex>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  {offer.oldPricePerPerson && headlinePerPerson != null && (
+                    <p className="text-xs tabular-nums text-theme-subtle line-through">
+                      {euro(offer.oldPricePerPerson)} € / osobi
+                    </p>
+                  )}
+                  <p className="text-sm font-medium tabular-nums text-theme-muted">
+                    {headlinePerPerson != null ? euro(headlinePerPerson) : "?"} €
+                    <span className="font-normal text-theme-subtle"> / osobi</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-theme-subtle">
+                    ukupno za {headlineCapacity} {peopleWord(headlineCapacity)}
+                  </p>
+                </div>
+                <p className="text-gradient-price text-2xl font-bold tabular-nums tracking-tight">
+                  {headlineTotal} €
+                </p>
+              </div>
             ) : (
-              <Text size="2" color="gray">
-                Cena na upit
-              </Text>
+              <p className="text-sm text-theme-muted">Cena na upit</p>
             )}
 
             {bestRoom && !bestRoom.fits && bestRoom.capacity != null && (
-              <Text as="p" size="1" color="amber" mt="1">
-                Najveća dostupna soba je za {bestRoom.capacity}{" "}
-                {peopleWord(bestRoom.capacity)} — manje od traženog broja.
-              </Text>
+              <p className="mt-2 text-xs leading-snug text-warning">
+                Najveća soba: {bestRoom.capacity} {peopleWord(bestRoom.capacity)} — manje od
+                traženog.
+              </p>
             )}
-          </Box>
-        </Box>
+          </div>
+        </div>
       </a>
-    </Card>
+    </article>
   );
 }

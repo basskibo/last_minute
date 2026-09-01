@@ -28,6 +28,29 @@ export default function SearchForm({
     a.localeCompare(b, "sr")
   );
   const months = upcomingMonths();
+  const destinations = allDestinations;
+
+  const destinationSelect = (
+    id: string,
+    triggerClass?: string,
+    placeholder = "npr. Grčka"
+  ) => (
+    <Select.Root
+      name="destination"
+      defaultValue={defaultDestination || undefined}
+      required
+      size="3"
+    >
+      <Select.Trigger id={id} placeholder={placeholder} className={triggerClass ?? "w-full"} />
+      <Select.Content>
+        {destinations.map((name) => (
+          <Select.Item key={name} value={name}>
+            {name}
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
 
   if (variant === "hero") {
     return (
@@ -48,20 +71,7 @@ export default function SearchForm({
               <MapPin size={14} className="text-[--accent-9]" />
               Destinacija
             </Text>
-            <TextField.Root
-              id="destination"
-              name="destination"
-              list="destination-options"
-              defaultValue={defaultDestination}
-              placeholder="npr. Grčka"
-              required
-              size="3"
-            />
-            <datalist id="destination-options">
-              {allDestinations.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
+            {destinationSelect("destination")}
           </Flex>
 
           <Flex direction="column" gap="1" className="min-w-[170px]">
@@ -136,7 +146,7 @@ export default function SearchForm({
           <Button
             type="submit"
             size="3"
-            className="!cursor-pointer !bg-gradient-to-r !from-sky-500 !to-indigo-600"
+            className="!cursor-pointer btn-brand"
           >
             <Search size={16} />
             Pretraži ponude
@@ -164,7 +174,7 @@ export default function SearchForm({
     );
   }
 
-  const fieldClass = "!bg-slate-900/50 !border-white/[0.08] focus-within:!border-sky-500/40";
+  const fieldClass = "field-theme";
   const formClass = embedded
     ? "w-full"
     : "surface-card w-full rounded-2xl p-4 sm:p-5";
@@ -174,34 +184,17 @@ export default function SearchForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-end">
         <div className="space-y-1.5">
           <label
-            htmlFor="destination"
-            className="text-[11px] font-medium uppercase tracking-wider text-slate-500"
+            htmlFor="destination-bar"
+            className="flex items-center gap-1.5 label-caps"
           >
+            <MapPin size={13} className="text-primary" />
             Destinacija
           </label>
-          <TextField.Root
-            id="destination"
-            name="destination"
-            list="destination-options-bar"
-            defaultValue={defaultDestination}
-            placeholder="npr. Grčka"
-            required
-            size="3"
-            className={fieldClass}
-          >
-            <TextField.Slot>
-              <MapPin size={15} className="text-sky-400/90" />
-            </TextField.Slot>
-          </TextField.Root>
-          <datalist id="destination-options-bar">
-            {allDestinations.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
+          {destinationSelect("destination-bar", `w-full ${fieldClass}`)}
         </div>
 
         <div className="space-y-1.5 sm:w-36">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+          <span className="label-caps">
             Period
           </span>
           <Select.Root name="month" defaultValue={defaultMonth || "any"} size="3">
@@ -220,7 +213,7 @@ export default function SearchForm({
         <div className="space-y-1.5 sm:w-20">
           <label
             htmlFor="adults-bar"
-            className="text-[11px] font-medium uppercase tracking-wider text-slate-500"
+            className="label-caps"
           >
             Odrasli
           </label>
@@ -235,7 +228,7 @@ export default function SearchForm({
             className={fieldClass}
           >
             <TextField.Slot>
-              <Users size={15} className="text-sky-400/90" />
+              <Users size={15} className="text-primary" />
             </TextField.Slot>
           </TextField.Root>
         </div>
@@ -243,7 +236,7 @@ export default function SearchForm({
         <div className="space-y-1.5 sm:w-20">
           <label
             htmlFor="children-bar"
-            className="text-[11px] font-medium uppercase tracking-wider text-slate-500"
+            className="label-caps"
           >
             Deca
           </label>
@@ -258,7 +251,7 @@ export default function SearchForm({
             className={fieldClass}
           >
             <TextField.Slot>
-              <Baby size={15} className="text-sky-400/90" />
+              <Baby size={15} className="text-primary" />
             </TextField.Slot>
           </TextField.Root>
         </div>
@@ -266,7 +259,7 @@ export default function SearchForm({
         <Button
           type="submit"
           size="3"
-          className="!w-full !cursor-pointer !bg-sky-500 hover:!bg-sky-400 sm:!w-auto sm:min-w-[7.5rem]"
+          className="!w-full btn-brand-solid sm:!w-auto sm:min-w-[7.5rem]"
         >
           <Search size={16} />
           Pretraži
@@ -274,15 +267,13 @@ export default function SearchForm({
       </div>
 
       {showQuickPicks && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-            Brzo:
-          </span>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border-muted)] pt-3">
+          <span className="label-caps">Brzo:</span>
           {LMP_POPULAR_DESTINATIONS.map((d) => (
             <a
               key={d}
               href={`/search?destination=${encodeURIComponent(d)}&adults=${defaultAdults}&children=${defaultChildren}`}
-              className="rounded-full bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-400 ring-1 ring-white/[0.06] transition hover:bg-slate-700 hover:text-slate-200"
+              className="chip-inactive !py-1 !px-2.5 hover:!text-theme-muted"
             >
               {d}
             </a>
