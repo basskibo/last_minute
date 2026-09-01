@@ -1,10 +1,15 @@
 import * as cheerio from "cheerio";
 import type { AccommodationType, Offer, Provider, RoomOption, SearchParams, TransportType } from "./types";
 import { findArgusLetovanjeSlug } from "./agency-destinations";
-import { fetchHtml, parsePriceEur } from "./scrape-utils";
+import { fetchHtml, firstImageSrc, parsePriceEur } from "./scrape-utils";
 
 const BASE_URL = "https://argus.rs";
 const AGENCY = "ArgusTours";
+const ARGUS_IMAGE = /\/media\/cofer\/(package|accommodation)\/image\//;
+
+function extractArgusCover(html: string): string | undefined {
+  return firstImageSrc(html, BASE_URL, ARGUS_IMAGE);
+}
 
 function inferTransport(text: string): TransportType[] {
   const t = text.toLowerCase();
@@ -64,7 +69,12 @@ function parseSummaryCards(html: string, country: string, sectionTransport: Tran
   return offers;
 }
 
-function parseDetailTables(html: string, country: string, regionPath: string): Offer[] {
+function parseDetailTables(
+  html: string,
+  country: string,
+  regionPath: string,
+  coverImage?: string
+): Offer[] {
   const $ = cheerio.load(html);
   const offers: Offer[] = [];
   const pageTransport = inferTransport($.text());
@@ -128,6 +138,7 @@ function parseDetailTables(html: string, country: string, regionPath: string): O
         transport: pageTransport[0] === "nepoznato" ? ["autobus"] : pageTransport,
         accommodation: inferAccommodation(`${currentProperty} ${currentRoom}`),
         roomOptions: roomOptions.sort((a, b) => a.price - b.price),
+        image: coverImage,
         sourceUrl: currentPropertyHref
           ? new URL(currentPropertyHref, BASE_URL).toString()
           : new URL(regionPath, BASE_URL).toString(),
@@ -168,25 +179,37 @@ export async function searchArgus(params: SearchParams): Promise<Offer[]> {
       offers
         .map((o) => {
           try {
-            const u = new URL(o.sourceUrl);
-            return u.pathname;
+            return new URL(o.sourceUrl).pathname;
           } catch {
             return null;
           }
         })
         .filter((p): p is string => Boolean(p && p !== countryPath && p.startsWith(countryPath)))
     ),
-  ].slice(0, 8);
+  ];
 
-  const detailResults = await Promise.allSettled(
+  const pageCache = new Map<string, { html: string; image?: string }>();
+  await Promise.allSettled(
     detailPaths.map(async (path) => {
-      const detailHtml = await fetchHtml(`${BASE_URL}${path}`);
-      return parseDetailTables(detailHtml, params.destination, path);
+      const html = await fetchHtml(`${BASE_URL}${path}`);
+      pageCache.set(path, { html, image: extractArgusCover(html) });
     })
   );
 
-  detailResults.forEach((result) => {
-    if (result.status === "fulfilled") offers.push(...result.value);
+  offers.forEach((o) => {
+    try {
+      const image = pageCache.get(new URL(o.sourceUrl).pathname)?.image;
+      if (image) o.image = image;
+    } catch {
+      /* ignore */
+    }
+  });
+
+  const tablePaths = detailPaths.slice(0, 8);
+  tablePaths.forEach((path) => {
+    const cached = pageCache.get(path);
+    if (!cached) return;
+    offers.push(...parseDetailTables(cached.html, params.destination, path, cached.image));
   });
 
   return offers;

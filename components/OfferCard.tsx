@@ -1,6 +1,7 @@
 import type { Offer } from "@/lib/providers/types";
+import { getProviderLogo } from "@/lib/provider-logos";
 import { pickBestRoom } from "@/lib/rooms";
-import { Bus, Car, CalendarDays, ImageOff, MapPin, Users } from "lucide-react";
+import { Bus, Car, CalendarDays, MapPin, Users } from "lucide-react";
 import { Badge, Box, Card, Flex, Heading, Text } from "@radix-ui/themes";
 
 const TRANSPORT_LABEL: Record<string, string> = {
@@ -47,6 +48,9 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
   const headlineTotal =
     headlinePerPerson != null ? euro(headlinePerPerson * headlineCapacity) : null;
 
+  const coverImage = offer.image ?? getProviderLogo(offer.provider);
+  const isAgencyLogo = !offer.image && Boolean(coverImage);
+
   return (
     <Card
       asChild
@@ -55,24 +59,25 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
     >
       <a href={offer.sourceUrl} target="_blank" rel="noopener noreferrer">
         <Box className="relative h-40 overflow-hidden">
-          {offer.image ? (
+          {coverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={offer.image}
-              alt={offer.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              src={coverImage}
+              alt={isAgencyLogo ? offer.sourceLabel : offer.title}
+              className={
+                isAgencyLogo
+                  ? "w-full h-full object-contain p-5 bg-[--gray-2]"
+                  : "w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              }
             />
           ) : (
             <Flex
               align="center"
               justify="center"
-              direction="column"
-              gap="1"
               className="w-full h-full bg-gradient-to-br from-[--gray-a3] via-[--gray-a3] to-[--accent-a3]"
             >
-              <ImageOff size={22} strokeWidth={1.5} className="text-[--gray-9]" />
-              <Text size="1" color="gray">
-                Nema slike
+              <Text size="2" weight="medium" color="gray" className="px-4 text-center">
+                {offer.sourceLabel}
               </Text>
             </Flex>
           )}

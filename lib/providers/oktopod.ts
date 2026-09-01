@@ -1,7 +1,13 @@
 import * as cheerio from "cheerio";
 import type { Offer, Provider, RoomOption, SearchParams, TransportType } from "./types";
+import { fetchHtml, firstImageSrc } from "./scrape-utils";
 
 const BASE_URL = "https://www.oktopod.rs";
+const OKTOPOD_IMAGE = /\/uploaded_pictures\/content\/putovanja\//;
+
+function extractOktopodCover(html: string): string | undefined {
+  return firstImageSrc(html, BASE_URL, OKTOPOD_IMAGE);
+}
 
 /**
  * Oktopod nema jedinstvenu, parametrizovanu pretragu po državi — svaka
@@ -56,18 +62,8 @@ function cleanVilaName(raw: string): { name: string; tags: string[] } {
   return { name: toTitleCase(name.replace(/\s+/g, " ").trim()), tags };
 }
 
-async function fetchHtml(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-      "Accept-Language": "sr-RS,sr;q=0.9,en;q=0.8",
-    },
-    cache: "no-store",
-    signal: AbortSignal.timeout(9000),
-  });
-  if (!res.ok) throw new Error(`oktopod.rs HTTP ${res.status}`);
-  return res.text();
+interface OktopodDraft extends Offer {
+  vilaHref?: string;
 }
 
 export async function searchOktopod(params: SearchParams): Promise<Offer[]> {
@@ -79,7 +75,7 @@ export async function searchOktopod(params: SearchParams): Promise<Offer[]> {
   const html = await fetchHtml(`${BASE_URL}${path}`);
   const $ = cheerio.load(html);
 
-  const offers: Offer[] = [];
+  const drafts: OktopodDraft[] = [];
 
   $(".date-section").each((_, section) => {
     const $section = $(section);
@@ -155,7 +151,7 @@ export async function searchOktopod(params: SearchParams): Promise<Offer[]> {
           ? `oktopod-${vilaHref}-${dateRange}`
           : `oktopod-${currentLocation}-${vilaName}-${dateRange}`;
 
-        offers.push({
+        drafts.push({
           id: id.replace(/\s+/g, "-").slice(0, 160),
           source: "oktopod.rs",
           sourceLabel: "Oktopod travel",
@@ -172,15 +168,30 @@ export async function searchOktopod(params: SearchParams): Promise<Offer[]> {
           transport: transportSet.size ? Array.from(transportSet) : ["nepoznato"],
           accommodation: ["apartman"],
           roomOptions: roomOptions.sort((a, b) => a.price - b.price),
-          image: undefined,
           sourceUrl: vilaHref ? new URL(vilaHref, BASE_URL).toString() : `${BASE_URL}${path}`,
           tags: ["Last minute", ...tags],
+          vilaHref: vilaHref ?? undefined,
         });
       });
     });
   });
 
-  return offers;
+  const uniqueVilaHrefs = [
+    ...new Set(drafts.map((d) => d.vilaHref).filter((h): h is string => Boolean(h))),
+  ].slice(0, 20);
+
+  const imageByHref = new Map<string, string | undefined>();
+  await Promise.allSettled(
+    uniqueVilaHrefs.map(async (href) => {
+      const html = await fetchHtml(new URL(href, BASE_URL).toString());
+      imageByHref.set(href, extractOktopodCover(html));
+    })
+  );
+
+  return drafts.map(({ vilaHref, ...offer }) => ({
+    ...offer,
+    image: vilaHref ? imageByHref.get(vilaHref) : undefined,
+  }));
 }
 
 export const oktopodProvider: Provider = {
