@@ -1,20 +1,21 @@
+import SearchPanelSkeleton, { ResultsGridSkeleton } from "@/components/SearchLoading";
+import { Loader2 } from "lucide-react";
+
 export default function Loading() {
   return (
-    <div className="flex flex-col flex-1 px-4 sm:px-6 py-8 gap-6 max-w-6xl mx-auto w-full animate-pulse">
-      <div className="h-32 rounded-2xl bg-slate-900 border border-slate-800" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-slate-800 overflow-hidden bg-slate-900">
-            <div className="h-40 bg-slate-800" />
-            <div className="p-4 flex flex-col gap-2">
-              <div className="h-4 w-2/3 bg-slate-800 rounded" />
-              <div className="h-3 w-1/2 bg-slate-800 rounded" />
-              <div className="h-3 w-full bg-slate-800 rounded" />
-              <div className="h-5 w-1/3 bg-slate-800 rounded mt-2" />
-            </div>
-          </div>
-        ))}
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      <header className="space-y-2">
+        <div className="skeleton-shimmer h-3 w-32 rounded" />
+        <div className="skeleton-shimmer h-8 w-48 rounded-lg" />
+      </header>
+
+      <div className="flex items-center gap-2 text-sm text-sky-400/90">
+        <Loader2 size={16} className="animate-spin" />
+        <span className="animate-pulse">Pretražujemo ponude sa agencija…</span>
       </div>
+
+      <SearchPanelSkeleton />
+      <ResultsGridSkeleton />
     </div>
   );
 }

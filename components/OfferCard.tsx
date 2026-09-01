@@ -30,8 +30,6 @@ function peopleWord(n: number): string {
   return "osoba";
 }
 
-/** Zaokruži na cele evre za prikaz — deljenje ukupne cene brojem osoba kod
- * Booking/Airbnb izvora zna da ostavi float ostatke (npr. 149.10000000000002). */
 const euro = (n: number) => Math.round(n);
 
 export default function OfferCard({ offer, people }: { offer: Offer; people: number }) {
@@ -50,15 +48,18 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
 
   const coverImage = offer.image ?? getProviderLogo(offer.provider);
   const isAgencyLogo = !offer.image && Boolean(coverImage);
+  const showLocation =
+    offer.location &&
+    offer.location.trim().toLowerCase() !== offer.title.trim().toLowerCase();
 
   return (
     <Card
       asChild
       size="2"
-      className="group !p-0 overflow-hidden hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300"
+      className="group !p-0 overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40"
     >
       <a href={offer.sourceUrl} target="_blank" rel="noopener noreferrer">
-        <Box className="relative h-40 overflow-hidden">
+        <Box className="relative aspect-[5/4] overflow-hidden bg-[--gray-3] sm:aspect-[4/3]">
           {coverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -66,66 +67,70 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
               alt={isAgencyLogo ? offer.sourceLabel : offer.title}
               className={
                 isAgencyLogo
-                  ? "w-full h-full object-contain p-5 bg-[--gray-2]"
-                  : "w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  ? "h-full w-full bg-slate-100 object-contain p-6 dark:bg-slate-200"
+                  : "h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               }
             />
           ) : (
             <Flex
               align="center"
               justify="center"
-              className="w-full h-full bg-gradient-to-br from-[--gray-a3] via-[--gray-a3] to-[--accent-a3]"
+              className="h-full w-full bg-gradient-to-br from-[--gray-a3] to-[--accent-a3]"
             >
               <Text size="2" weight="medium" color="gray" className="px-4 text-center">
                 {offer.sourceLabel}
               </Text>
             </Flex>
           )}
+
           {discount != null && (
             <Badge
               color="ruby"
               variant="solid"
               radius="full"
-              className="absolute top-2.5 left-2.5 shadow-sm"
+              className="absolute left-2.5 top-2.5 shadow-sm"
             >
               -{discount}%
             </Badge>
           )}
+
           <Badge
             color="gray"
             variant="solid"
             highContrast
             radius="full"
-            className="absolute top-2.5 right-2.5 shadow-sm"
+            className="absolute right-2.5 top-2.5 shadow-sm"
           >
             {offer.sourceLabel}
           </Badge>
         </Box>
 
         <Box p="4">
-          <Heading size="3" className="line-clamp-1">
+          <Heading size="3" className="line-clamp-2 leading-snug">
             {offer.title}
           </Heading>
 
-          <Flex direction="column" gap="1" mt="1">
-            {offer.location && (
-              <Flex align="center" gap="2">
-                <MapPin size={13} className="shrink-0 text-[--accent-9]" />
-                <Text size="2" color="gray" className="line-clamp-1">
-                  {offer.location}
-                </Text>
-              </Flex>
-            )}
-            {offer.dateRange && (
-              <Flex align="center" gap="2">
-                <CalendarDays size={13} className="shrink-0 text-[--accent-9]" />
-                <Text size="2" color="gray">
-                  {offer.dateRange}
-                  {offer.nights ? ` · ${offer.nights}` : ""}
-                </Text>
-              </Flex>
-            )}
-          </Flex>
+          {(showLocation || offer.dateRange) && (
+            <Flex direction="column" gap="1" mt="1.5">
+              {showLocation && (
+                <Flex align="center" gap="2">
+                  <MapPin size={13} className="shrink-0 text-[--accent-9]" />
+                  <Text size="2" color="gray" className="line-clamp-1">
+                    {offer.location}
+                  </Text>
+                </Flex>
+              )}
+              {offer.dateRange && (
+                <Flex align="center" gap="2">
+                  <CalendarDays size={13} className="shrink-0 text-[--accent-9]" />
+                  <Text size="2" color="gray">
+                    {offer.dateRange}
+                    {offer.nights ? ` · ${offer.nights}` : ""}
+                  </Text>
+                </Flex>
+              )}
+            </Flex>
+          )}
 
           {tags.length > 0 && (
             <Flex gap="1" wrap="wrap" mt="2">
@@ -144,7 +149,7 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
           )}
 
           {offer.roomOptions && offer.roomOptions.length > 0 && (
-            <Box mt="2" className="rounded-lg bg-[--gray-a3] overflow-hidden">
+            <Box mt="2" className="overflow-hidden rounded-lg bg-[--gray-a3]">
               {offer.roomOptions.map((r, i) => (
                 <Flex
                   key={r.label}
@@ -154,10 +159,10 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                   py="2"
                   className={i !== 0 ? "border-t border-[--gray-a5]" : ""}
                 >
-                  <Text size="2" color="gray">
+                  <Text size="2" color="gray" className="line-clamp-1 flex-1">
                     {r.label}
                   </Text>
-                  <Flex align="center" gap="2">
+                  <Flex align="center" gap="2" className="shrink-0">
                     {r.transportIncluded === true && (
                       <Bus size={13} className="text-[--accent-9]" aria-label="Prevoz uključen" />
                     )}
@@ -180,7 +185,7 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                 justify="between"
                 gap="2"
                 p="3"
-                className="rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white"
+                className="rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-950/25"
               >
                 <Box>
                   <Text
@@ -191,7 +196,7 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                   >
                     Ukupno za grupu
                   </Text>
-                  <Text as="p" size="6" weight="bold">
+                  <Text as="p" size="6" weight="bold" className="tabular-nums">
                     {headlineTotal} €
                   </Text>
                 </Box>
@@ -202,9 +207,9 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                       {headlineCapacity} {peopleWord(headlineCapacity)}
                     </Text>
                   </Flex>
-                  <Text as="p" size="1">
+                  <Text as="p" size="1" className="tabular-nums">
                     {offer.oldPricePerPerson && (
-                      <span className="line-through opacity-60 mr-1">
+                      <span className="mr-1 line-through opacity-60">
                         {euro(offer.oldPricePerPerson)} €
                       </span>
                     )}
@@ -217,10 +222,11 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
                 Cena na upit
               </Text>
             )}
-            {bestRoom && !bestRoom.fits && (
+
+            {bestRoom && !bestRoom.fits && bestRoom.capacity != null && (
               <Text as="p" size="1" color="amber" mt="1">
-                Najveća dostupna soba je za {bestRoom.capacity ?? "?"}{" "}
-                {peopleWord(bestRoom.capacity ?? 0)} — manje od traženog broja.
+                Najveća dostupna soba je za {bestRoom.capacity}{" "}
+                {peopleWord(bestRoom.capacity)} — manje od traženog broja.
               </Text>
             )}
           </Box>

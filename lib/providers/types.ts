@@ -24,7 +24,7 @@ export interface Offer {
   sourceLabel: string;
   provider: string;
   title: string;
-  location: string;
+  location?: string;
   country?: string;
   agency?: string;
   description?: string;

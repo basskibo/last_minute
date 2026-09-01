@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowUpDown, ListChecks } from "lucide-react";
-import { Flex, Select, Text } from "@radix-ui/themes";
+import { ArrowUpDown } from "lucide-react";
+import { Select } from "@radix-ui/themes";
 
 const SORT_OPTIONS: { value: string; label: string }[] = [
-  { value: "price-asc", label: "Cena: najniža prvo" },
-  { value: "price-desc", label: "Cena: najviša prvo" },
+  { value: "price-asc", label: "Najjeftinije" },
+  { value: "price-desc", label: "Najskuplje" },
   { value: "discount", label: "Najveći popust" },
 ];
 
@@ -14,6 +14,7 @@ export default function FiltersBar({ resultCount }: { resultCount: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSort = searchParams.get("sort") || "price-asc";
+  const currentLabel = SORT_OPTIONS.find((o) => o.value === currentSort)?.label ?? "Sortiraj";
 
   function handleSortChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -22,18 +23,19 @@ export default function FiltersBar({ resultCount }: { resultCount: number }) {
   }
 
   return (
-    <Flex align="center" justify="between" gap="4" mb="4">
-      <Text size="2" color="gray" className="flex items-center gap-1.5">
-        <ListChecks size={15} className="text-[--accent-9]" />
-        {resultCount} pronađenih ponuda
-      </Text>
-      <Flex align="center" gap="2">
-        <Text size="2" color="gray" className="flex items-center gap-1.5">
-          <ArrowUpDown size={14} />
-          Sortiraj:
-        </Text>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-slate-400">
+        <span className="text-lg font-bold tabular-nums text-white">{resultCount}</span>
+        <span className="ml-1.5">ponuda</span>
+      </p>
+
+      <div className="flex items-center gap-2">
+        <ArrowUpDown size={14} className="text-slate-500" aria-hidden />
         <Select.Root value={currentSort} onValueChange={handleSortChange} size="2">
-          <Select.Trigger />
+          <Select.Trigger
+            className="!min-w-[9rem] !bg-slate-800/60 !border-white/[0.08] !text-slate-300"
+            aria-label={`Sortiraj: ${currentLabel}`}
+          />
           <Select.Content>
             {SORT_OPTIONS.map((opt) => (
               <Select.Item key={opt.value} value={opt.value}>
@@ -42,7 +44,7 @@ export default function FiltersBar({ resultCount }: { resultCount: number }) {
             ))}
           </Select.Content>
         </Select.Root>
-      </Flex>
-    </Flex>
+      </div>
+    </div>
   );
 }

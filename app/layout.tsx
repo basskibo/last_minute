@@ -1,3 +1,4 @@
+import SiteHeader from "@/components/SiteHeader";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Theme } from "@radix-ui/themes";
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           panelBackground="solid"
           className="min-h-full flex flex-col flex-1"
         >
+          <SiteHeader />
           {children}
         </Theme>
       </body>

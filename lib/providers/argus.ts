@@ -54,7 +54,6 @@ function parseSummaryCards(html: string, country: string, sectionTransport: Tran
       sourceLabel: AGENCY,
       provider: "argus",
       title,
-      location: title,
       country,
       agency: AGENCY,
       pricePerPerson: price,
@@ -212,7 +211,15 @@ export async function searchArgus(params: SearchParams): Promise<Offer[]> {
     offers.push(...parseDetailTables(cached.html, params.destination, path, cached.image));
   });
 
-  return offers;
+  const detailPathsSet = new Set(tablePaths);
+  return offers.filter((o) => {
+    if (!o.id.startsWith("argus-summary-")) return true;
+    try {
+      return !detailPathsSet.has(new URL(o.sourceUrl).pathname);
+    } catch {
+      return true;
+    }
+  });
 }
 
 export const argusProvider: Provider = {
