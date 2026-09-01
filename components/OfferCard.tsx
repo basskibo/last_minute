@@ -62,7 +62,7 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
         href={offer.sourceUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-full min-h-0 flex-col"
+        className="offer-card-link"
       >
         <div className="relative h-44 shrink-0 overflow-hidden surface-muted">
           {coverImage ? (

@@ -25,7 +25,7 @@ export default function ResultsGrid({ offers, people }: { offers: Offer[]; peopl
       {offers.map((offer, i) => (
         <div
           key={offer.id}
-          className="animate-fade-up h-full"
+          className="animate-fade-up h-full overflow-visible"
           style={{ animationDelay: `${Math.min(i, 11) * 40}ms` }}
         >
           <OfferCard offer={offer} people={people} />
