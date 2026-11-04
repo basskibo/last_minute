@@ -9,11 +9,11 @@ const redis = url && token ? new Redis({ url, token }) : null;
 const TTL_SECONDS = 60 * 60 * 3;
 
 export function buildCacheKey(params: SearchParams): string {
-  // Scraping izvora zavisi samo od destinacije (mesec/broj osoba se
-  // primenjuju naknadno nad već preuzetim rezultatima), pa keš namerno
-  // ignoriše te parametre da se izbegne nepotrebno dupliranje keša.
+  // Booking/Airbnb traže konkretne datume i broj gostiju, a cena po osobi
+  // zavisi od broja osoba — zato mesec i broj gostiju ulaze u ključ.
   const dest = params.destination.trim().toLowerCase();
-  return `search:${dest}`;
+  const period = params.checkin && params.checkout ? `${params.checkin}_${params.checkout}` : params.month ?? "any";
+  return `search:v2:${dest}:${period}:${params.adults}:${params.children}`;
 }
 
 export async function getCached<T>(key: string): Promise<T | null> {

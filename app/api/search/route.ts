@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SearchParams } from "@/lib/providers/types";
 import { performSearch } from "@/lib/search";
 import type { SortOption } from "@/lib/normalize";
+import { isValidRange } from "@/lib/dates";
 
 export const runtime = "nodejs";
 // Booking/Airbnb koriste headless browser (Playwright) koji je sporiji od
@@ -35,7 +36,22 @@ function parseParams(
   const providersRaw = searchParams.get("providers");
   const providerFilter = providersRaw ? providersRaw.split(",") : undefined;
 
-  return { params: { destination, adults, children, month }, sort, providerFilter };
+  const fromRaw = searchParams.get("from") ?? undefined;
+  const toRaw = searchParams.get("to") ?? undefined;
+  const exact = isValidRange(fromRaw, toRaw);
+
+  return {
+    params: {
+      destination,
+      adults,
+      children,
+      month: exact ? undefined : month,
+      checkin: exact ? fromRaw : undefined,
+      checkout: exact ? toRaw : undefined,
+    },
+    sort,
+    providerFilter,
+  };
 }
 
 export async function GET(req: NextRequest) {

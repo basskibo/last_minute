@@ -8,15 +8,16 @@ import { filipTravelProvider } from "./filiptravel";
 import { bookingProvider } from "./booking";
 import { airbnbProvider } from "./airbnb";
 
+/** Redosled = redosled u listi izvora u UI-ju; Booking i Airbnb su prioritet. */
 export const providers: Provider[] = [
+  bookingProvider,
+  airbnbProvider,
   lastMinutePonudeProvider,
   oktopodProvider,
   argusProvider,
   travellandProvider,
   grandToursProvider,
   filipTravelProvider,
-  bookingProvider,
-  airbnbProvider,
 ];
 
 export * from "./types";

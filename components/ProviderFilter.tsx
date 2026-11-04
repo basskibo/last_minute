@@ -1,45 +1,34 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
 import { useAppPreferences } from "@/components/providers/AppProviders";
 import type { ProviderStatus } from "@/lib/search";
 
+/** Lista izvora sa checkboxovima. `selected` null = svi izvori. */
 export default function ProviderFilter({
   providerStatus,
+  selected,
+  onChange,
 }: {
   providerStatus: ProviderStatus[];
+  selected: string[] | null;
+  onChange: (next: string[] | null) => void;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useAppPreferences();
-
-  const activeRaw = searchParams.get("providers");
-  const active = activeRaw ? activeRaw.split(",") : null;
-
-  function toggle(id: string) {
-    const current = active ?? providerStatus.map((p) => p.id);
-    const next = current.includes(id)
-      ? current.filter((p) => p !== id)
-      : [...current, id];
-
-    const params = new URLSearchParams(searchParams.toString());
-    if (next.length === 0 || next.length === providerStatus.length) {
-      params.delete("providers");
-    } else {
-      params.set("providers", next.join(","));
-    }
-    router.push(`/search?${params.toString()}`);
-  }
-
   if (providerStatus.length === 0) return null;
 
-  const activeCount = active ? active.length : providerStatus.length;
+  function toggle(id: string) {
+    const current = selected ?? providerStatus.map((p) => p.id);
+    const next = current.includes(id) ? current.filter((p) => p !== id) : [...current, id];
+    onChange(next.length === 0 || next.length === providerStatus.length ? null : next);
+  }
+
+  const activeCount = selected ? selected.length : providerStatus.length;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-ink">{t("providers.label")}</h2>
+        <h3 className="lm-filter__title">{t("providers.label")}</h3>
         <span className="font-mono text-xs tabular text-ink-subtle">
           {activeCount}/{providerStatus.length} {t("providers.active")}
         </span>
@@ -47,13 +36,13 @@ export default function ProviderFilter({
 
       <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 lg:grid-cols-1">
         {providerStatus.map((p) => {
-          const isActive = active ? active.includes(p.id) : true;
+          const isActive = selected ? selected.includes(p.id) : true;
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => toggle(p.id)}
-              title={p.note}
+              title={p.note ?? p.label}
               aria-pressed={isActive}
               className={`lm-check ${p.count === 0 ? "text-ink-subtle" : ""}`}
             >

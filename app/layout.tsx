@@ -1,4 +1,3 @@
-import HomeHero from "@/components/HomeHero";
 import { AppProviders } from "@/components/providers/AppProviders";
 import SiteHeader from "@/components/SiteHeader";
 import ThemeInitScript from "@/components/ThemeInitScript";

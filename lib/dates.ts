@@ -8,11 +8,20 @@ function toIso(d: Date): string {
  * izabranog meseca, ili ~2 nedelje unapred ako mesec nije zadat (tipično
  * za last-minute pretragu).
  */
-export function pickStayDates(month?: string): {
+export function pickStayDates(
+  month?: string,
+  exact?: { checkin?: string; checkout?: string }
+): {
   checkin: string;
   checkout: string;
   nights: number;
 } {
+  if (exact?.checkin && exact.checkout && isValidRange(exact.checkin, exact.checkout)) {
+    const nightsExact = Math.round(
+      (Date.parse(exact.checkout) - Date.parse(exact.checkin)) / 86_400_000
+    );
+    return { checkin: exact.checkin, checkout: exact.checkout, nights: nightsExact };
+  }
   const now = new Date();
   let start: Date;
 
@@ -37,4 +46,19 @@ export function formatDateRange(checkinIso: string, checkoutIso: string): string
   const [, cm, cd] = checkinIso.split("-");
   const [ey, em, ed] = checkoutIso.split("-");
   return `${cd}.${cm} - ${ed}.${em}.${ey}.`;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Ispravan opseg: oba ISO datuma, povratak posle polaska, najviše 60 noći. */
+export function isValidRange(checkin?: string, checkout?: string): boolean {
+  if (!checkin || !checkout || !ISO_DATE.test(checkin) || !ISO_DATE.test(checkout)) return false;
+  const a = Date.parse(checkin);
+  const b = Date.parse(checkout);
+  return Number.isFinite(a) && Number.isFinite(b) && b > a && b - a <= 60 * 86_400_000;
+}
+
+/** "2026-08-14" → "2026-08" (za rangiranje agencijskih ponuda po mesecu). */
+export function monthOf(isoDate?: string): string | undefined {
+  return isoDate && ISO_DATE.test(isoDate) ? isoDate.slice(0, 7) : undefined;
 }

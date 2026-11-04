@@ -5,10 +5,10 @@ import { useAppPreferences } from "@/components/providers/AppProviders";
 
 interface SearchEmptyPromptProps {
   adults: number;
-  children: number;
+  childrenCount: number;
 }
 
-export default function SearchEmptyPrompt({ adults, children }: SearchEmptyPromptProps) {
+export default function SearchEmptyPrompt({ adults, childrenCount }: SearchEmptyPromptProps) {
   const { t } = useAppPreferences();
 
   return (
@@ -16,7 +16,7 @@ export default function SearchEmptyPrompt({ adults, children }: SearchEmptyPromp
       <p className="font-display text-2xl font-bold tracking-tight text-ink">
         {t("search.emptyPrompt")}
       </p>
-      <SearchForm variant="hero" defaultAdults={adults} defaultChildren={children} showQuickPicks />
+      <SearchForm variant="hero" defaultAdults={adults} defaultChildren={childrenCount} showQuickPicks />
     </main>
   );
 }

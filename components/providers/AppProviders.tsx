@@ -19,7 +19,12 @@ import {
 
 export type ThemeMode = "light" | "dark";
 
-const STORAGE_THEME = "lmf-theme";
+/**
+ * v2: stara verzija je pri svakom učitavanju upisivala tadašnju
+ * podrazumevanu temu ("dark"), pa su svi raniji posetioci ostajali u tamnoj
+ * temi. Novi ključ + upis samo na eksplicitan izbor korisnika.
+ */
+const STORAGE_THEME = "lmf-theme-v2";
 const STORAGE_LOCALE = "lmf-locale";
 
 interface AppPreferences {
@@ -52,6 +57,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((next: ThemeMode) => {
     setThemeState(next);
+    try {
+      localStorage.setItem(STORAGE_THEME, next);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const setLocale = useCallback((next: Locale) => {
@@ -60,11 +70,6 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    try {
-      localStorage.setItem(STORAGE_THEME, theme);
-    } catch {
-      /* ignore */
-    }
   }, [theme]);
 
   useEffect(() => {

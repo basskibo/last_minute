@@ -2,6 +2,9 @@ import { providers } from "./providers";
 import type { Offer, SearchParams } from "./providers/types";
 import { buildCacheKey, getCached, setCached } from "./cache";
 import { mergeOffers, prioritizeMonth, sortOffers, type SortOption } from "./normalize";
+import { offerMentionsPlace, type DestinationEntry } from "./destinations";
+import { resolveDestination } from "./ai/resolve-destination";
+import { monthOf } from "./dates";
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -20,10 +23,34 @@ export interface ProviderStatus {
 interface CachedPayload {
   offers: Offer[];
   providerStatus: ProviderStatus[];
+  destination?: ResolvedDestinationInfo;
+}
+
+/**
+ * Ne filtrira: ponude koje pominju traženo mesto (npr. "Barselona" kad
+ * agencije vrate celu Španiju) idu na vrh, ostale ostaju ispod.
+ */
+function prioritizePlace(offers: Offer[], place?: DestinationEntry): Offer[] {
+  if (!place) return offers;
+  const text = (o: Offer) => [o.title, o.location, o.description].filter(Boolean).join(" ");
+  const matching = offers.filter((o) => o.provider === "booking" || o.provider === "airbnb" || offerMentionsPlace(text(o), place));
+  const rest = offers.filter((o) => !matching.includes(o));
+  return [...matching, ...rest];
+}
+
+export interface ResolvedDestinationInfo {
+  query: string;
+  /** Država za agencijske izvore, ako je prepoznata */
+  country?: string;
+  /** Mesto unutar države (Barselona), ako je traženo mesto a ne država */
+  place?: string;
+  /** Engleski naziv za međunarodne sajtove ("Barcelona, Spain") */
+  bookingQuery?: string;
 }
 
 export interface SearchResult {
   offers: Offer[];
+  destination?: ResolvedDestinationInfo;
   cached: boolean;
   errors: { provider: string; message: string }[];
   providerStatus: ProviderStatus[];
@@ -45,14 +72,16 @@ function finalizeSearchResult(
   merged: Offer[],
   providerStatus: ProviderStatus[],
   errors: SearchResult["errors"],
-  cached: boolean
+  cached: boolean,
+  destination?: ResolvedDestinationInfo,
+  place?: DestinationEntry
 ): SearchResult {
   const filtered =
     providerFilter && providerFilter.length > 0
       ? merged.filter((o) => providerFilter.includes(o.provider))
       : merged;
-  const offers = prioritizeMonth(sortOffers(filtered, sort), params.month);
-  return { offers, cached, errors, providerStatus };
+  const offers = prioritizePlace(prioritizeMonth(sortOffers(filtered, sort), params.month ?? monthOf(params.checkin)), place);
+  return { offers, cached, errors, providerStatus, destination };
 }
 
 export async function performSearch(
@@ -74,6 +103,15 @@ export async function performSearchStreaming(
 
   const cacheKey = buildCacheKey(params);
   const cached = await getCached<CachedPayload>(cacheKey);
+  const resolved = await resolveDestination(params.destination);
+  const destination: ResolvedDestinationInfo = {
+    query: params.destination,
+    country: resolved.country,
+    place: resolved.place?.name,
+    bookingQuery: resolved.bookingQuery,
+  };
+  const countryParams: SearchParams = { ...params, destination: resolved.country ?? params.destination };
+  const placeParams: SearchParams = { ...params, bookingQuery: resolved.bookingQuery };
   if (cached) {
     let offersSoFar = 0;
     cached.providerStatus.forEach((provider, i) => {
@@ -94,7 +132,9 @@ export async function performSearchStreaming(
       cached.offers,
       cached.providerStatus,
       [],
-      true
+      true,
+      destination,
+      resolved.place
     );
     emit({ type: "complete", totalProviders, result });
     return result;
@@ -108,7 +148,10 @@ export async function performSearchStreaming(
 
   await Promise.all(
     providers.map((provider, index) =>
-      withTimeout(provider.search(params), provider.timeoutMs ?? 8000)
+      withTimeout(
+        provider.search(provider.scope === "place" ? placeParams : countryParams),
+        provider.timeoutMs ?? 8000
+      )
         .then((offers) => {
           perProviderResults[index] = offers;
           const status: ProviderStatus = {
@@ -154,7 +197,7 @@ export async function performSearchStreaming(
   );
 
   const merged = mergeOffers(perProviderResults);
-  await setCached<CachedPayload>(cacheKey, { offers: merged, providerStatus });
+  await setCached<CachedPayload>(cacheKey, { offers: merged, providerStatus, destination });
 
   const result = finalizeSearchResult(
     params,
@@ -163,7 +206,9 @@ export async function performSearchStreaming(
     merged,
     providerStatus,
     errors,
-    false
+    false,
+    destination,
+    resolved.place
   );
   emit({ type: "complete", totalProviders, result });
   return result;

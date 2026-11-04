@@ -1,6 +1,6 @@
 import SearchEmptyPrompt from "@/components/SearchEmptyPrompt";
 import SearchPageClient from "@/components/SearchPageClient";
-import type { SortOption } from "@/lib/normalize";
+import { isValidRange } from "@/lib/dates";
 
 export const maxDuration = 60;
 
@@ -8,34 +8,39 @@ interface SearchPageProps {
   searchParams: Promise<{
     destination?: string;
     month?: string;
+    from?: string;
+    to?: string;
     adults?: string;
     children?: string;
-    sort?: string;
-    providers?: string;
   }>;
+}
+
+function clampInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sp = await searchParams;
   const destination = sp.destination?.trim() ?? "";
-  const adults = sp.adults ? parseInt(sp.adults, 10) || 2 : 2;
-  const children = sp.children ? parseInt(sp.children, 10) || 0 : 0;
-  const sort = (sp.sort as SortOption) || "price-asc";
-  const month = sp.month && sp.month !== "any" ? sp.month : undefined;
-  const providerFilter = sp.providers ? sp.providers.split(",") : undefined;
+  const adults = clampInt(sp.adults, 2, 1, 20);
+  const childCount = clampInt(sp.children, 0, 0, 10);
+  const exact = isValidRange(sp.from, sp.to);
+  const month = !exact && sp.month && sp.month !== "any" ? sp.month : undefined;
 
   if (!destination) {
-    return <SearchEmptyPrompt adults={adults} children={children} />;
+    return <SearchEmptyPrompt adults={adults} childrenCount={childCount} />;
   }
 
   return (
     <SearchPageClient
+      key={`${destination}|${month}|${sp.from}|${sp.to}|${adults}|${childCount}`}
       destination={destination}
       month={month}
+      from={exact ? sp.from : undefined}
+      to={exact ? sp.to : undefined}
       adults={adults}
-      children={children}
-      sort={sort}
-      providerFilter={providerFilter}
+      childrenCount={childCount}
     />
   );
 }

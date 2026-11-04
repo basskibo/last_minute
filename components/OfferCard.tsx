@@ -6,7 +6,8 @@ import { getProviderLogo } from "@/lib/provider-logos";
 import { pickBestRoom } from "@/lib/rooms";
 import { useAppPreferences } from "@/components/providers/AppProviders";
 import { peopleWord, type MessageKey } from "@/lib/i18n/messages";
-import { AlertTriangle, Bus, CalendarDays, Car, MapPin } from "lucide-react";
+import { AlertTriangle, Bus, CalendarDays, Car, MapPin, Sparkles, Star } from "lucide-react";
+import type { AiPick } from "@/lib/ai/analyze";
 
 const TRANSPORT_KEYS: Record<string, MessageKey> = {
   avion: "offer.transport.avion",
@@ -30,7 +31,15 @@ function discountPercent(offer: Offer): number | null {
 
 const euro = (n: number) => Math.round(n);
 
-export default function OfferCard({ offer, people }: { offer: Offer; people: number }) {
+export default function OfferCard({
+  offer,
+  people,
+  aiPick,
+}: {
+  offer: Offer;
+  people: number;
+  aiPick?: AiPick;
+}) {
   const { locale, t } = useAppPreferences();
   const discount = discountPercent(offer);
   const fmt = (n: number) => euro(n).toLocaleString(locale === "en" ? "en-GB" : "sr-Latn-RS");
@@ -64,7 +73,7 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
       href={offer.sourceUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="lm-offer group"
+      className={`lm-offer group ${aiPick ? "lm-offer--ai" : ""}`}
     >
       <div
         className={`relative aspect-[16/10] shrink-0 overflow-hidden ${
@@ -86,8 +95,21 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
           />
         )}
 
-        {discount != null && (
-          <span className="lm-badge lm-badge--deal absolute left-3 top-3">−{discount}%</span>
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          {aiPick && (
+            <span className="lm-badge lm-badge--ai">
+              <Sparkles size={12} aria-hidden />
+              {t("ai.badge", { rank: aiPick.rank })}
+            </span>
+          )}
+          {discount != null && <span className="lm-badge lm-badge--deal">−{discount}%</span>}
+        </div>
+
+        {offer.rating != null && (
+          <span className="lm-badge lm-badge--rating absolute right-3 top-3">
+            <Star size={12} aria-hidden className="fill-current" />
+            {offer.rating.toFixed(1)}
+          </span>
         )}
 
         <span className="lm-badge lm-badge--source absolute bottom-3 left-3 max-w-[75%] truncate">
@@ -99,6 +121,13 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
         <h3 className="line-clamp-2 text-base font-semibold leading-[22px] tracking-tight text-ink">
           {offer.title}
         </h3>
+
+        {aiPick && (
+          <p className="lm-offer__ai">
+            <Sparkles size={13} className="mt-0.5 shrink-0" aria-hidden />
+            <span className="line-clamp-3">{aiPick.reason}</span>
+          </p>
+        )}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] leading-[18px] text-ink-muted">
           {showLocation && (
@@ -115,6 +144,10 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
           )}
           {offer.nights && <span className="lm-badge lm-badge--brand">{offer.nights}</span>}
         </div>
+
+        {offer.reviewCount != null && (
+          <p className="text-xs text-ink-subtle">{t("offer.reviews", { count: offer.reviewCount })}</p>
+        )}
 
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">

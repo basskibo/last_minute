@@ -54,6 +54,15 @@ Copy `.env.example` to `.env.local` if you want caching:
 cp .env.example .env.local
 ```
 
+- `GEMINI_API_KEY` — enables the AI analysis on the results page (best
+  matches, insights, cautions) and resolves unknown places to a country
+  (e.g. "Kapadokija" → Turska). Get a free key at
+  https://aistudio.google.com/apikey. On Vercel: Project → Settings →
+  Environment Variables → add `GEMINI_API_KEY`, then redeploy. Without it
+  the app works normally and the AI panel says it's off.
+- `GEMINI_MODEL` (optional) — pin a model (e.g. `gemini-2.5-flash`). By
+  default the app uses `gemini-flash-latest` and falls back to other Flash
+  models if one is unavailable.
 - `KV_REST_API_URL` / `KV_REST_API_TOKEN` — Upstash Redis REST credentials.
   On Vercel: Project → Storage → add a Redis (Marketplace) integration, and
   it sets these automatically. Without them the app works normally, just

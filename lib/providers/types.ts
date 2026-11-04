@@ -6,8 +6,17 @@ export interface SearchParams {
   destination: string;
   /** Fleksibilan period, format "yyyy-mm" (npr. "2026-08"), opciono */
   month?: string;
+  /** Tačni datumi (ISO yyyy-mm-dd), opciono — imaju prednost nad `month` */
+  checkin?: string;
+  checkout?: string;
   adults: number;
   children: number;
+  /**
+   * Naziv za Booking/Airbnb (engleski, sa državom: "Barcelona, Spain").
+   * Popunjava ga lib/search.ts; provajderi sa scope "place" ga koriste
+   * umesto `destination`.
+   */
+  bookingQuery?: string;
 }
 
 export interface RoomOption {
@@ -40,6 +49,10 @@ export interface Offer {
   image?: string;
   sourceUrl: string;
   tags: string[];
+  /** Ocena gostiju na skali 0–10 (Booking direktno, Airbnb ×2) */
+  rating?: number;
+  /** Broj recenzija, ako ga izvor daje */
+  reviewCount?: number;
 }
 
 export interface ProviderResult {
@@ -55,5 +68,11 @@ export interface Provider {
   note?: string;
   /** Timeout za ovaj izvor u ms — headless-browser izvori su sporiji od običnog fetch-a (default 8000) */
   timeoutMs?: number;
+  /**
+   * "country" (podrazumevano): izvor pretražuje po državi, pa dobija
+   * razrešenu državu (Barselona → Španija). "place": izvor razume bilo
+   * koje mesto (Booking, Airbnb).
+   */
+  scope?: "country" | "place";
   search(params: SearchParams): Promise<Offer[]>;
 }

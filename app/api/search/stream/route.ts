@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import type { SearchParams } from "@/lib/providers/types";
 import { performSearchStreaming, type SearchProgressEvent } from "@/lib/search";
+import { isValidRange } from "@/lib/dates";
 import type { SortOption } from "@/lib/normalize";
 
 export const runtime = "nodejs";
@@ -33,7 +34,22 @@ function parseParams(
   const providersRaw = searchParams.get("providers");
   const providerFilter = providersRaw ? providersRaw.split(",") : undefined;
 
-  return { params: { destination, adults, children, month }, sort, providerFilter };
+  const fromRaw = searchParams.get("from") ?? undefined;
+  const toRaw = searchParams.get("to") ?? undefined;
+  const exact = isValidRange(fromRaw, toRaw);
+
+  return {
+    params: {
+      destination,
+      adults,
+      children,
+      month: exact ? undefined : month,
+      checkin: exact ? fromRaw : undefined,
+      checkout: exact ? toRaw : undefined,
+    },
+    sort,
+    providerFilter,
+  };
 }
 
 function sseLine(data: SearchProgressEvent | { error: string }): string {

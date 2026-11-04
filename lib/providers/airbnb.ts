@@ -1,5 +1,5 @@
 import type { Offer, Provider, SearchParams } from "./types";
-import { launchBrowser } from "../browser";
+import { acquireBrowserContext } from "../browser";
 import { pickStayDates, formatDateRange } from "../dates";
 
 /**
@@ -22,18 +22,17 @@ function parsePriceRow(text: string): { oldTotal: number | null; newTotal: numbe
 }
 
 export async function searchAirbnb(params: SearchParams): Promise<Offer[]> {
-  const { checkin, checkout, nights } = pickStayDates(params.month);
-  const browser = await launchBrowser();
+  const { checkin, checkout, nights } = pickStayDates(params.month, params);
+  const { context, release } = await acquireBrowserContext();
 
   try {
-    const page = await browser.newPage({
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-      viewport: { width: 1366, height: 900 },
-      locale: "en-US",
-    });
+    const page = await context.newPage();
+    const place = params.bookingQuery || params.destination;
 
-    const url = new URL(`https://www.airbnb.com/s/${encodeURIComponent(params.destination)}/homes`);
+    const url = new URL(
+      `https://www.airbnb.com/s/${encodeURIComponent(place.replace(/,\s*/g, "--").replace(/\s+/g, "-"))}/homes`
+    );
+    url.searchParams.set("query", place);
     url.searchParams.set("checkin", checkin);
     url.searchParams.set("checkout", checkout);
     url.searchParams.set("adults", String(params.adults));
@@ -44,6 +43,8 @@ export async function searchAirbnb(params: SearchParams): Promise<Offer[]> {
     await page
       .waitForSelector('[itemprop="itemListElement"]', { timeout: 15000 })
       .catch(() => null);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => null);
+    await page.waitForTimeout(1000);
 
     const raw = await page.$$eval('[itemprop="itemListElement"]', (nodes) =>
       nodes.map((card) => {
@@ -57,6 +58,7 @@ export async function searchAirbnb(params: SearchParams): Promise<Offer[]> {
           priceRow: q('[data-testid="price-availability-row"]')?.textContent?.trim() ?? "",
           url: q('meta[itemprop="url"]')?.getAttribute("content") ?? "",
           image: q("img")?.getAttribute("src") ?? "",
+          allText: (card as HTMLElement).innerText ?? card.textContent ?? "",
         };
       })
     );
@@ -69,6 +71,9 @@ export async function searchAirbnb(params: SearchParams): Promise<Offer[]> {
       .map((r): Offer => {
         const { oldTotal, newTotal } = parsePriceRow(r.priceRow);
         const total = newTotal ?? oldTotal;
+        // Ocena u kartici: "4.92 (128)" — Airbnb skala 1–5, mi čuvamo 0–10.
+        const ratingMatch = r.allText.match(/(\d\.\d{1,2})\s*\((\d[\d,]*)\)/);
+        const rating5 = ratingMatch ? parseFloat(ratingMatch[1]) : null;
         return {
           id: `airbnb-${r.url.split("?")[0]}`.slice(0, 160),
           source: "airbnb.com",
@@ -83,21 +88,24 @@ export async function searchAirbnb(params: SearchParams): Promise<Offer[]> {
           currency: "EUR",
           nights: `${nights} noćenja`,
           dateRange,
-          transport: ["nepoznato"],
+          transport: ["sopstveni"],
           accommodation: ["apartman"],
           image: r.image || undefined,
           sourceUrl: r.url.startsWith("http") ? r.url : `https://www.airbnb.com${r.url}`,
-          tags: [],
+          tags: rating5 != null ? [`Ocena ${rating5.toFixed(2)} / 5`] : [],
+          rating: rating5 != null && rating5 <= 5 ? Math.round(rating5 * 20) / 10 : undefined,
+          reviewCount: ratingMatch ? parseInt(ratingMatch[2].replace(/,/g, ""), 10) : undefined,
         };
       });
   } finally {
-    await browser.close();
+    await release();
   }
 }
 
 export const airbnbProvider: Provider = {
   id: "airbnb",
   label: "Airbnb",
-  timeoutMs: 30000,
+  scope: "place",
+  timeoutMs: 40000,
   search: searchAirbnb,
 };
