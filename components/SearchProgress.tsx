@@ -27,39 +27,34 @@ export default function SearchProgress({ progress }: { progress: SearchProgressS
     totalProviders > 0 ? Math.round((completedProviders / totalProviders) * 100) : 0;
 
   return (
-    <div className="surface-card space-y-4 rounded-2xl p-4 sm:p-5">
+    <div className="lm-panel flex flex-col gap-4 p-4 sm:p-5">
       <div className="flex items-start gap-3">
-        <Loader2 size={18} className="mt-0.5 shrink-0 animate-spin text-primary" />
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-sm font-medium text-theme-muted">{t("progress.searching")}</p>
+        <Loader2 size={18} className="mt-0.5 shrink-0 animate-spin text-primary" aria-hidden />
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="text-sm font-semibold text-ink">{t("progress.searching")}</p>
           {started && totalProviders > 0 ? (
-            <p className="text-sm text-theme-muted">
-              <span className="font-semibold tabular-nums text-theme">
-                {completedProviders}
-              </span>
-              <span>
-                {" "}
-                / {totalProviders} {t("progress.agencies")}
-              </span>
-              <span className="mx-2 text-theme-subtle">·</span>
-              <span className="font-semibold tabular-nums text-primary">{offersSoFar}</span>
-              <span> {t("progress.offers")}</span>
+            <p className="text-sm text-ink-muted">
+              <span className="font-semibold tabular text-ink">{completedProviders}</span>
+              {" "}/ {totalProviders} {t("progress.agencies")}
+              <span className="mx-2 text-ink-subtle">·</span>
+              <span className="font-semibold tabular text-primary">{offersSoFar}</span>{" "}
+              {t("progress.offers")}
             </p>
           ) : (
-            <p className="text-sm text-theme-subtle">{t("progress.starting")}</p>
+            <p className="text-sm text-ink-subtle">{t("progress.starting")}</p>
           )}
         </div>
       </div>
 
       <div
-        className="progress-track"
+        className="lm-progress"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
       >
         <div
-          className="progress-fill"
+          className="lm-progress__fill"
           style={{ width: `${Math.max(pct, started ? 4 : 0)}%` }}
         />
       </div>
@@ -69,19 +64,15 @@ export default function SearchProgress({ progress }: { progress: SearchProgressS
           {providers.map((p) => (
             <li
               key={p.id}
-              className={
-                p.failed
-                  ? "inline-flex items-center gap-1.5 rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] px-2.5 py-1 text-xs font-medium text-danger ring-1 ring-[color-mix(in_srgb,var(--danger)_25%,transparent)]"
-                  : "chip-inactive !inline-flex items-center gap-1.5 !py-1 !px-2.5"
-              }
+              className={`lm-badge ${p.failed ? "bg-deal-soft text-danger" : "lm-badge--neutral"}`}
             >
               {p.failed ? (
-                <X size={11} className="shrink-0" />
+                <X size={12} className="shrink-0" aria-hidden />
               ) : (
-                <Check size={11} className="shrink-0 text-primary" />
+                <Check size={12} className="shrink-0 text-primary" aria-hidden />
               )}
               {p.label}
-              <span className="tabular-nums text-theme-subtle">{p.count}</span>
+              <span className="font-mono tabular text-ink-subtle">{p.count}</span>
             </li>
           ))}
         </ul>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { Check } from "lucide-react";
 import { useAppPreferences } from "@/components/providers/AppProviders";
 import type { ProviderStatus } from "@/lib/search";
 
@@ -36,37 +37,31 @@ export default function ProviderFilter({
   const activeCount = active ? active.length : providerStatus.length;
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="label-caps">{t("providers.label")}</p>
-        <span className="text-[11px] tabular-nums text-theme-subtle">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink">{t("providers.label")}</h2>
+        <span className="font-mono text-xs tabular text-ink-subtle">
           {activeCount}/{providerStatus.length} {t("providers.active")}
         </span>
       </div>
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 lg:grid-cols-1">
         {providerStatus.map((p) => {
           const isActive = active ? active.includes(p.id) : true;
-          const isEmpty = p.count === 0;
-
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => toggle(p.id)}
               title={p.note}
-              className={[
-                "shrink-0 transition-all",
-                isActive ? "chip-active" : "chip-inactive",
-                isEmpty && isActive ? "opacity-60" : "",
-              ].join(" ")}
+              aria-pressed={isActive}
+              className={`lm-check ${p.count === 0 ? "text-ink-subtle" : ""}`}
             >
-              {p.label}
-              <span
-                className={`ml-1.5 tabular-nums ${isActive ? "text-primary" : "text-theme-subtle"}`}
-              >
-                {p.count}
+              <span className="lm-check__box" aria-hidden>
+                {isActive && <Check size={12} strokeWidth={3} />}
               </span>
+              <span className="truncate">{p.label}</span>
+              <span className="lm-check__count tabular">{p.count}</span>
             </button>
           );
         })}
