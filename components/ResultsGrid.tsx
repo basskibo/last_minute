@@ -10,18 +10,18 @@ export default function ResultsGrid({ offers, people }: { offers: Offer[]; peopl
 
   if (offers.length === 0) {
     return (
-      <div className="flex flex-col items-center py-16 text-center text-theme-subtle">
-        <div className="mb-3 rounded-full border border-[var(--border)] surface-card p-3">
-          <SearchX size={22} className="text-theme-subtle" />
+      <div className="lm-panel flex flex-col items-center px-6 py-16 text-center text-ink-subtle">
+        <div className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-surface-2">
+          <SearchX size={22} className="text-ink-muted" aria-hidden />
         </div>
-        <p className="text-lg font-medium text-theme-muted">{t("results.emptyTitle")}</p>
+        <p className="font-display text-xl font-bold text-ink">{t("results.emptyTitle")}</p>
         <p className="mt-1 text-sm">{t("results.emptyHint")}</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
       {offers.map((offer, i) => (
         <div
           key={offer.id}

@@ -9,12 +9,17 @@ import SearchProgress, {
   type SearchProgressState,
 } from "@/components/SearchProgress";
 import SearchPanelSkeleton, { ResultsGridSkeleton } from "@/components/SearchLoading";
+import FiltersBar from "@/components/FiltersBar";
 import { useAppPreferences } from "@/components/providers/AppProviders";
 import { formatGuests } from "@/lib/i18n/messages";
 import type { SearchResult } from "@/lib/search";
 import type { SortOption } from "@/lib/normalize";
 import { Callout } from "@radix-ui/themes";
 import { AlertTriangle, Info, Users } from "lucide-react";
+
+const CONTAINER =
+  "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8";
+const LAYOUT = "grid grid-cols-1 items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-8";
 
 interface SearchPageClientProps {
   destination: string;
@@ -119,93 +124,95 @@ export default function SearchPageClient({
 
   const guestSummary = formatGuests(adults, children, locale);
 
+  const searchBar = (
+    <SearchForm
+      variant="bar"
+      defaultDestination={destination}
+      defaultMonth={month}
+      defaultAdults={adults}
+      defaultChildren={children}
+    />
+  );
+
+  const pageHeader = (
+    <header className="space-y-1.5">
+      <p className="lm-label">{t("search.resultsLabel")}</p>
+      <h1 className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-ink sm:text-[40px]">
+        {destination}
+      </h1>
+      <p className="inline-flex items-center gap-1.5 text-[15px] text-ink-muted">
+        <Users size={15} className="text-primary" aria-hidden />
+        {guestSummary}
+      </p>
+    </header>
+  );
+
   if (fetchError) {
     return (
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        <Callout.Root color="ruby" variant="soft">
+      <div className={CONTAINER}>
+        {searchBar}
+        <Callout.Root color="ruby" variant="soft" className="!rounded-xl">
+          <Callout.Icon>
+            <AlertTriangle size={16} />
+          </Callout.Icon>
           <Callout.Text>{fetchError}</Callout.Text>
         </Callout.Root>
-        <SearchForm
-          variant="bar"
-          defaultDestination={destination}
-          defaultMonth={month}
-          defaultAdults={adults}
-          defaultChildren={children}
-        />
       </div>
     );
   }
 
   if (!result) {
     return (
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        <header className="space-y-1">
-          <p className="label-caps">{t("search.resultsLabel")}</p>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-theme sm:text-3xl">
-              {destination}
-            </h1>
-            <p className="chip-inactive !inline-flex items-center gap-1.5 !py-1">
-              <Users size={13} className="text-primary" />
-              {guestSummary}
-            </p>
-          </div>
-        </header>
-
-        <SearchProgress progress={progress} />
-        <SearchPanelSkeleton />
-        <ResultsGridSkeleton />
+      <div className={CONTAINER}>
+        {searchBar}
+        {pageHeader}
+        <div className={LAYOUT}>
+          <SearchPanelSkeleton />
+          <section className="flex min-w-0 flex-col gap-5">
+            <SearchProgress progress={progress} />
+            <ResultsGridSkeleton />
+          </section>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-      <header className="space-y-1">
-        <p className="label-caps">{t("search.resultsLabel")}</p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-theme sm:text-3xl">
-            {destination}
-          </h1>
-          <p className="chip-inactive !inline-flex items-center gap-1.5 !py-1">
-            <Users size={13} className="text-primary" />
-            {guestSummary}
-          </p>
-        </div>
-      </header>
+    <div className={CONTAINER}>
+      {searchBar}
+      {pageHeader}
 
-      <SearchPanel
-        destination={destination}
-        month={month}
-        adults={adults}
-        children={children}
-        providerStatus={result.providerStatus}
-        resultCount={result.offers.length}
-      />
+      <div className={LAYOUT}>
+        <SearchPanel providerStatus={result.providerStatus} />
 
-      {result.errors.length > 0 && (
-        <Callout.Root color="amber" variant="soft" className="!rounded-xl">
-          <Callout.Icon>
-            <AlertTriangle size={16} />
-          </Callout.Icon>
-          <Callout.Text>
-            {t("search.sourcesPartial", {
-              sources: result.errors.map((e) => e.provider).join(", "),
-            })}
-          </Callout.Text>
-        </Callout.Root>
-      )}
+        <section className="flex min-w-0 flex-col gap-5">
+          <FiltersBar resultCount={result.offers.length} />
 
-      {month && (
-        <Callout.Root color="gray" variant="soft" className="!rounded-xl">
-          <Callout.Icon>
-            <Info size={16} />
-          </Callout.Icon>
-          <Callout.Text>{t("search.monthHint")}</Callout.Text>
-        </Callout.Root>
-      )}
+          {result.errors.length > 0 && (
+            <Callout.Root color="amber" variant="soft" className="!rounded-xl">
+              <Callout.Icon>
+                <AlertTriangle size={16} />
+              </Callout.Icon>
+              <Callout.Text>
+                {t("search.sourcesPartial", {
+                  sources: result.errors.map((e) => e.provider).join(", "),
+                })}
+              </Callout.Text>
+            </Callout.Root>
+          )}
 
-      <ResultsGrid offers={result.offers} people={people} />
+          {month && (
+            <Callout.Root color="gray" variant="soft" className="!rounded-xl">
+              <Callout.Icon>
+                <Info size={16} />
+              </Callout.Icon>
+              <Callout.Text>{t("search.monthHint")}</Callout.Text>
+            </Callout.Root>
+          )}
+
+          <ResultsGrid offers={result.offers} people={people} />
+        </section>
+      </div>
     </div>
   );
 }

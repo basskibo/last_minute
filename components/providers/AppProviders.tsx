@@ -33,10 +33,10 @@ interface AppPreferences {
 const AppPreferencesContext = createContext<AppPreferences | null>(null);
 
 function readInitialTheme(): ThemeMode {
-  if (typeof document === "undefined") return "dark";
-  return document.documentElement.getAttribute("data-theme") === "light"
-    ? "light"
-    : "dark";
+  if (typeof document === "undefined") return "light";
+  return document.documentElement.getAttribute("data-theme") === "dark"
+    ? "dark"
+    : "light";
 }
 
 function readInitialLocale(): Locale {
@@ -94,8 +94,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <AppPreferencesContext.Provider value={value}>
       <Theme
         appearance={theme}
-        accentColor="gray"
-        grayColor="slate"
+        accentColor="teal"
+        grayColor="sand"
         radius="large"
         panelBackground="solid"
         className="min-h-full flex flex-col flex-1"

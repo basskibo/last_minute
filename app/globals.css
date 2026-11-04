@@ -1,358 +1,416 @@
 @import "tailwindcss";
 
-/* ─── Design tokens ───────────────────────────────────────────────
-   Primary  → teal   (akcije, ikone, aktivni filteri, fokus)
-   Accent   → emerald (gradienti, cene, uspeh)
-   Neutral  → zinc   (površine, tekst, borderi)
-   Semantic → warning, danger
+/* ─── Design tokens — pravac „Obala“ ─────────────────────────────
+   Izvor: dizajn sistem „Poslednji Trenutak“ (tokens.json).
+   Svetla tema (Obala) je podrazumevana; tamna (Noćno more) preko
+   [data-theme="dark"].
+   bg / surface / surface-2  → površine (pesak → bela → uvučeno)
+   ink / ink-muted / ink-subtle → tekst
+   primary (teal)            → akcije, aktivno stanje
+   deal (koral)              → SAMO popust i istek ponude
    ─────────────────────────────────────────────────────────────── */
 :root {
-  --bg: #020617;
-  --fg: #fafafa;
+  color-scheme: light;
 
-  --surface: #18181b;
-  --surface-muted: #27272a;
-  --surface-elevated: #3f3f46;
-  --surface-overlay: rgb(0 0 0 / 0.55);
+  --bg: #f6f1e9;
+  --surface: #ffffff;
+  --surface-2: #efe8dc;
 
-  --primary: #4bc4b5;
-  --primary-hover: #6dd4c8;
-  --primary-fg: #042f2e;
-  --primary-muted: rgb(75 196 181 / 0.1);
-  --primary-ring: rgb(75 196 181 / 0.22);
+  --ink: #0f2129;
+  --ink-muted: #45565e;
+  --ink-subtle: #5e6d73;
 
-  --accent: #5fd99a;
-  --accent-muted: rgb(95 217 154 / 0.08);
+  --line: #e2d9cb;
+  --line-strong: #8f9a9c;
 
-  --text: #fafafa;
-  --text-muted: #a1a1aa;
-  --text-subtle: #71717a;
+  --primary: #0b7268;
+  --primary-hover: #095d55;
+  --primary-fg: #ffffff;
+  --primary-soft: #d9eeea;
 
-  --border: rgb(255 255 255 / 0.08);
-  --border-muted: rgb(255 255 255 / 0.06);
+  --deal: #c2410c;
+  --deal-fg: #ffffff;
+  --deal-soft: #fbe3d6;
 
-  --success: #86efac;
-  --warning: #fbbf24;
-  --danger: #fb7185;
+  --sun: #f2b632;
+  --success: #15803d;
+  --warning: #a16207;
+  --danger: #be123c;
+  --focus: #0b7268;
+  --overlay: #0f2129cc;
 
-  --shadow-brand: 0 8px 24px -8px rgb(59 180 165 / 0.16);
-  --gradient-brand: linear-gradient(to right, #4bc4b5, #6dd4a8);
-  --gradient-brand-br: linear-gradient(to bottom right, #38a898, #4bc4b5);
-  --gradient-hero: linear-gradient(to bottom, rgb(15 23 42 / 0.5), transparent);
+  --shadow-card: 0 1px 2px #0f21290f, 0 8px 24px -12px #0f21291f;
+  --shadow-pop: 0 2px 4px #0f21290f, 0 20px 40px -16px #0f212938;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
 }
 
-[data-theme="light"] {
-  --bg: #fafafa;
-  --fg: #09090b;
+[data-theme="dark"] {
+  color-scheme: dark;
 
-  --surface: #ffffff;
-  --surface-muted: #f4f4f5;
-  --surface-elevated: #e4e4e7;
-  --surface-overlay: rgb(255 255 255 / 0.88);
+  --bg: #0a1316;
+  --surface: #111d21;
+  --surface-2: #18272c;
 
-  --primary: #0f9b8e;
-  --primary-hover: #14b8a6;
-  --primary-fg: #ffffff;
-  --primary-muted: rgb(15 155 142 / 0.1);
-  --primary-ring: rgb(15 155 142 / 0.24);
+  --ink: #edf3f1;
+  --ink-muted: #a6b6b8;
+  --ink-subtle: #869598;
 
-  --accent: #16a873;
-  --accent-muted: rgb(22 168 115 / 0.08);
+  --line: #22333a;
+  --line-strong: #5b6f75;
 
-  --text: #18181b;
-  --text-muted: #52525b;
-  --text-subtle: #71717a;
+  --primary: #3cc6b4;
+  --primary-hover: #62d6c6;
+  --primary-fg: #04201d;
+  --primary-soft: #123a37;
 
-  --border: rgb(0 0 0 / 0.08);
-  --border-muted: rgb(0 0 0 / 0.05);
+  --deal: #ff8a65;
+  --deal-fg: #2a0b02;
+  --deal-soft: #3a1d14;
 
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #e11d48;
+  --success: #6ee7a0;
+  --warning: #fcd34d;
+  --danger: #fb7185;
+  --focus: #62d6c6;
+  --overlay: #0a1316cc;
 
-  --shadow-brand: 0 8px 24px -8px rgb(15 155 142 / 0.12);
-  --gradient-brand: linear-gradient(to right, #0f9b8e, #16a873);
-  --gradient-brand-br: linear-gradient(to bottom right, #0d9488, #14b8a6);
-  --gradient-hero: linear-gradient(to bottom, rgb(241 245 249 / 0.9), transparent);
+  --shadow-card: 0 1px 2px #00000066;
+  --shadow-pop: 0 20px 40px -16px #000000a6;
 }
 
 @theme inline {
-  --color-background: var(--bg);
-  --color-foreground: var(--fg);
+  --color-bg: var(--bg);
   --color-surface: var(--surface);
-  --color-surface-muted: var(--surface-muted);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
-  --color-accent: var(--accent);
-  --color-muted: var(--text-muted);
-  --color-subtle: var(--text-subtle);
-  --color-border: var(--border);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-deal: var(--deal);
+  --color-deal-fg: var(--deal-fg);
+  --color-deal-soft: var(--deal-soft);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-bricolage), var(--font-geist-sans);
+}
+
+/* Radix Themes preuzima naše površine i teal akcenat */
+.radix-themes {
+  --default-font-family: var(--font-geist-sans), system-ui, sans-serif;
+  --color-background: var(--bg);
+  --color-panel-solid: var(--surface);
+  --color-surface: var(--surface);
+  --accent-9: var(--primary);
+  --accent-10: var(--primary-hover);
+  --accent-contrast: var(--primary-fg);
+  --focus-8: var(--focus);
 }
 
 body {
   background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-@layer utilities {
-  /* ── Površine ── */
-  .surface-card {
-    border: 1px solid var(--border);
-    background: var(--surface);
+:where(a, button, input, select, [role="combobox"]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .font-display {
+    font-family: var(--font-bricolage), var(--font-geist-sans), sans-serif;
   }
 
-  .surface-muted {
-    background: var(--surface-muted);
-  }
-
-  .glass-panel {
-    border: 1px solid var(--border);
-    background: color-mix(in srgb, var(--surface) 72%, transparent);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-  }
-
-  /* ── Tipografija ── */
-  .text-theme { color: var(--text); }
-  .text-theme-muted { color: var(--text-muted); }
-  .text-theme-subtle { color: var(--text-subtle); }
-
-  .text-gradient-brand {
-    background: var(--gradient-brand);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .text-gradient-price {
-    background: linear-gradient(to right, var(--primary), var(--accent));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .text-price-accent {
-    color: var(--accent);
-  }
-
-  /* ── Label / tag ── */
-  .label-caps {
+  /* ── Label ── */
+  .lm-label {
+    display: block;
     font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.05em;
+    line-height: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-subtle);
+    color: var(--ink-subtle);
   }
 
-  .tag-brand {
-    border-radius: 0.375rem;
-    background: color-mix(in srgb, var(--primary-muted) 70%, var(--surface-muted));
-    padding: 0.125rem 0.5rem;
-    font-size: 11px;
-    font-weight: 500;
-    color: color-mix(in srgb, var(--primary) 75%, var(--text-muted));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, var(--border));
-  }
-
-  .chip-active {
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--primary-muted) 50%, var(--surface-elevated) 50%);
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 22%, var(--border));
-  }
-
-  .chip-inactive {
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--surface-muted) 80%, transparent);
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-subtle);
-    box-shadow: inset 0 0 0 1px var(--border-muted);
-    transition: color 0.15s ease;
-  }
-
-  .chip-inactive:hover {
-    color: var(--text-muted);
-  }
-
-  /* ── Forme ── */
-  .field-theme {
-    background: color-mix(in srgb, var(--surface) 92%, var(--bg)) !important;
-    border-color: var(--border) !important;
-  }
-
-  .field-theme:focus-within {
-    border-color: var(--primary-ring) !important;
-  }
-
-  /* ── Dugmad ── */
-  .btn-brand {
-    cursor: pointer;
-    background: var(--gradient-brand) !important;
-    color: var(--primary-fg) !important;
+  /* ── Button ── */
+  .lm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    font-size: 15px;
     font-weight: 600;
-  }
-
-  .btn-brand-solid {
+    line-height: 1;
     cursor: pointer;
-    background: var(--primary) !important;
-    color: var(--primary-fg) !important;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .lm-btn--primary { background: var(--primary); color: var(--primary-fg); }
+  .lm-btn--primary:hover { background: var(--primary-hover); }
+  .lm-btn--secondary { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+  .lm-btn--secondary:hover { border-color: var(--ink); }
+  .lm-btn--ghost { background: transparent; color: var(--primary); }
+  .lm-btn--ghost:hover { background: var(--primary-soft); }
+  .lm-btn--pill { border-radius: var(--radius-pill); }
+  .lm-btn--lg { height: 56px; padding: 0 28px; font-size: 16px; }
+  .lm-btn--sm { height: 36px; padding: 0 14px; font-size: 14px; }
+
+  /* ── Chip ── */
+  .lm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-muted);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .lm-chip:hover { border-color: var(--line-strong); color: var(--ink); }
+  .lm-chip--active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+
+  /* ── Badge ── */
+  .lm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
     font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .lm-badge--deal { background: var(--deal); color: var(--deal-fg); font-weight: 700; }
+  .lm-badge--brand { background: var(--primary-soft); color: var(--primary); }
+  .lm-badge--neutral { background: var(--surface-2); color: var(--ink-muted); }
+  .lm-badge--source {
+    background: var(--overlay);
+    color: #ffffff;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
-  .btn-brand-solid:hover {
-    background: var(--primary-hover) !important;
+  /* ── Card / panel ── */
+  .lm-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
   }
 
-  /* ── Kartica ponude ── */
-  .offer-card {
+  /* ── Search bar ── */
+  .lm-search {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
+  }
+  .lm-search__field {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    transition: background 0.15s;
+  }
+  .lm-search__field:hover,
+  .lm-search__field:focus-within { background: var(--surface-2); }
+  /* Radix Select/trigger unutar polja: bez sopstvenog okvira */
+  .lm-search__trigger {
+    width: 100%;
+    justify-content: space-between;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 22px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 15px !important;
+    font-weight: 500;
+    color: var(--ink) !important;
+    cursor: pointer;
+  }
+  .lm-search__trigger[data-placeholder],
+  .lm-search__trigger[data-placeholder] > span { color: var(--ink-subtle) !important; }
+  .lm-search .lm-btn { min-height: 52px; }
+
+  @media (min-width: 768px) {
+    .lm-search { flex-direction: row; align-items: stretch; gap: 0; border-radius: var(--radius-pill); }
+    .lm-search__field { flex: 1; padding: 8px 20px; border-radius: var(--radius-pill); }
+    .lm-search__field--narrow { flex: 0 0 190px; }
+    .lm-search__field + .lm-search__field::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 14px;
+      bottom: 14px;
+      width: 1px;
+      background: var(--line);
+    }
+    .lm-search__field:hover::before,
+    .lm-search__field:focus-within::before,
+    .lm-search__field:hover + .lm-search__field::before,
+    .lm-search__field:focus-within + .lm-search__field::before { opacity: 0; }
+    .lm-search .lm-btn { min-height: 56px; }
+  }
+
+  .lm-search--compact { box-shadow: none; }
+  @media (min-width: 768px) {
+    .lm-search--compact { padding: 4px; }
+    .lm-search--compact .lm-search__field { padding: 4px 16px; }
+    .lm-search--compact .lm-btn { min-height: 44px; height: 44px; }
+  }
+
+  /* ── Stepper (putnici) ── */
+  .lm-stepper { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; }
+  .lm-stepper + .lm-stepper { border-top: 1px solid var(--line); }
+  .lm-stepper__btn {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .lm-stepper__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── Photo placeholder ── */
+  .lm-photo-fallback {
+    background:
+      radial-gradient(circle at 72% 34%, var(--sun) 0 13%, transparent 13.5%),
+      linear-gradient(180deg, #8fd3d1 0%, #cfeee6 52%, #1f8f8a 52%, #0b5f63 100%);
+  }
+
+  /* ── Offer card ── */
+  .lm-offer {
     position: relative;
     display: flex;
     height: 100%;
     flex-direction: column;
-    border-radius: 1rem;
-    background: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--surface) 92%, #09090b),
-      color-mix(in srgb, var(--surface-muted) 88%, #09090b)
-    );
-  }
-
-  .offer-card-link {
-    display: flex;
-    height: 100%;
-    min-height: 0;
-    flex-direction: column;
     overflow: hidden;
-    border-radius: inherit;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
     color: inherit;
     text-decoration: none;
+    transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
   }
+  .lm-offer:hover { box-shadow: var(--shadow-pop); transform: translateY(-2px); border-color: var(--line-strong); }
+  .lm-offer:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-  .offer-card::after {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    border-radius: inherit;
-    box-shadow: inset 0 0 0 1px var(--border);
-    transition: box-shadow 0.25s ease;
+  .lm-rooms {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    font-size: 13px;
+    line-height: 18px;
   }
+  .lm-rooms__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; color: var(--ink-muted); }
+  .lm-rooms__row + .lm-rooms__row { border-top: 1px solid var(--line); }
 
-  .offer-card::before {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset-inline: 0;
-    top: 0;
-    z-index: 2;
-    height: 1px;
-    background: linear-gradient(to right, transparent, var(--border), transparent);
-    opacity: 0.8;
+  /* ── Segmented control ── */
+  .lm-seg {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
   }
+  .lm-seg__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 30px;
+    min-width: 34px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink-subtle);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  .lm-seg__btn:hover { color: var(--ink); }
+  .lm-seg__btn[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
 
-  .offer-card:hover::after {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--primary) 24%, var(--border)),
-      var(--shadow-brand);
+  /* ── Checkbox red (filter izvora) ── */
+  .lm-check {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    background: none;
+    border: 0;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
   }
+  .lm-check__box {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--line-strong);
+    color: var(--primary-fg);
+  }
+  .lm-check[aria-pressed="true"] .lm-check__box { background: var(--primary); border-color: var(--primary); }
+  .lm-check__count { margin-left: auto; font-family: var(--font-geist-mono), monospace; font-size: 12px; color: var(--ink-subtle); }
 
   /* ── Progress ── */
-  .progress-track {
-    height: 0.375rem;
-    overflow: hidden;
-    border-radius: 9999px;
-    background: var(--surface-muted);
-  }
+  .lm-progress { height: 4px; overflow: hidden; border-radius: 2px; background: var(--surface-2); }
+  .lm-progress__fill { height: 100%; border-radius: 2px; background: var(--primary); transition: width 0.5s ease-out; }
+}
 
-  .progress-fill {
-    height: 100%;
-    border-radius: 9999px;
-    background: var(--gradient-brand);
-    transition: width 0.5s ease-out;
-  }
-
-  /* ── Header logo ── */
-  .logo-brand {
-    display: flex;
-    height: 2rem;
-    width: 2rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.5rem;
-    background: var(--gradient-brand-br);
-    box-shadow: 0 2px 10px rgb(59 180 165 / 0.18);
-  }
-
-  /* ── Hero dekoracija ── */
-  .hero-glow-primary {
-    background: color-mix(in srgb, var(--primary) 8%, transparent);
-  }
-
-  .hero-glow-accent {
-    background: color-mix(in srgb, var(--accent) 5%, transparent);
-  }
-
-  .nights-badge {
-    margin-left: 0.25rem;
-    border-radius: 0.25rem;
-    background: color-mix(in srgb, var(--primary-muted) 80%, var(--surface-muted));
-    padding: 0.125rem 0.375rem;
-    font-size: 11px;
-    font-weight: 600;
-    color: color-mix(in srgb, var(--primary) 70%, var(--text));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 20%, var(--border));
-    white-space: nowrap;
-  }
-
-  /* ── Header toggles ── */
-  .header-toggle-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.125rem;
-    border-radius: 0.5rem;
-    padding: 0.125rem;
-    background: color-mix(in srgb, var(--surface-muted) 80%, transparent);
-    box-shadow: inset 0 0 0 1px var(--border-muted);
-  }
-
-  .header-toggle-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 2rem;
-    height: 1.75rem;
-    padding: 0 0.5rem;
-    border-radius: 0.375rem;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--text-subtle);
-    transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .header-toggle-btn:hover {
-    color: var(--text-muted);
-  }
-
-  .header-toggle-btn-active {
-    color: var(--text);
-    background: var(--surface);
-    box-shadow:
-      inset 0 0 0 1px var(--border),
-      0 1px 2px rgb(0 0 0 / 0.06);
-  }
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
 
   /* ── Skeleton / animacije ── */
   @keyframes shimmer {
@@ -361,13 +419,7 @@ body {
   }
 
   .skeleton-shimmer {
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--surface-muted) 70%, transparent) 0%,
-      color-mix(in srgb, var(--surface-elevated) 90%, transparent) 45%,
-      color-mix(in srgb, var(--surface-muted) 70%, transparent) 55%,
-      color-mix(in srgb, var(--surface-muted) 70%, transparent) 100%
-    );
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--line) 45%, var(--surface-2) 55%, var(--surface-2) 100%);
     background-size: 200% 100%;
     animation: shimmer 1.8s ease-in-out infinite;
   }
@@ -377,8 +429,11 @@ body {
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .animate-fade-up {
-    animation: fade-up 0.45s ease-out both;
+  .animate-fade-up { animation: fade-up 0.45s ease-out both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-up, .skeleton-shimmer { animation: none; }
+    .lm-offer:hover { transform: none; }
   }
 
   input[type="number"]::-webkit-inner-spin-button,

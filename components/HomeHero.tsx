@@ -2,28 +2,28 @@
 
 import SearchForm from "@/components/SearchForm";
 import { useAppPreferences } from "@/components/providers/AppProviders";
-import { Sparkles } from "lucide-react";
 
 export default function HomeHero() {
   const { t } = useAppPreferences();
 
   return (
-    <>
-      <div className="flex max-w-2xl flex-col gap-3 text-center">
-        <span className="inline-flex items-center gap-1.5 self-center rounded-full border border-[var(--primary-ring)] bg-[var(--primary-muted)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary shadow-sm backdrop-blur-sm">
-          <Sparkles size={13} />
+    <section className="flex flex-col gap-8">
+      <div className="flex max-w-3xl flex-col gap-5">
+        <span className="inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-deal">
+          <span aria-hidden className="h-2 w-2 rounded-full bg-deal" />
           {t("home.badge")}
         </span>
-        <h1 className="text-4xl font-bold tracking-tight text-theme sm:text-5xl">
-          {t("home.titleStart")}{" "}
-          <span className="text-gradient-brand">{t("home.titleHighlight")}</span>
+        <h1 className="font-display text-[44px] font-bold leading-[1.02] tracking-[-0.035em] text-ink sm:text-[64px] lg:text-[72px]">
+          {t("home.titleStart")} <span className="text-primary">{t("home.titleHighlight")}</span>
         </h1>
-        <p className="text-base text-theme-muted sm:text-lg">{t("home.subtitle")}</p>
+        <p className="max-w-xl text-base leading-7 text-ink-muted sm:text-lg">
+          {t("home.subtitle")}
+        </p>
       </div>
 
-      <SearchForm variant="hero" />
+      <SearchForm variant="hero" showQuickPicks />
 
-      <p className="max-w-xl text-center text-xs text-theme-subtle">{t("home.disclaimer")}</p>
-    </>
+      <p className="max-w-xl text-xs leading-5 text-ink-subtle">{t("home.disclaimer")}</p>
+    </section>
   );
 }

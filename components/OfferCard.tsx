@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import type { Offer } from "@/lib/providers/types";
 import { getProviderLogo } from "@/lib/provider-logos";
 import { pickBestRoom } from "@/lib/rooms";
 import { useAppPreferences } from "@/components/providers/AppProviders";
 import { peopleWord, type MessageKey } from "@/lib/i18n/messages";
-import { Bus, CalendarDays, Car, MapPin } from "lucide-react";
+import { AlertTriangle, Bus, CalendarDays, Car, MapPin } from "lucide-react";
 
 const TRANSPORT_KEYS: Record<string, MessageKey> = {
   avion: "offer.transport.avion",
@@ -32,6 +33,7 @@ const euro = (n: number) => Math.round(n);
 export default function OfferCard({ offer, people }: { offer: Offer; people: number }) {
   const { locale, t } = useAppPreferences();
   const discount = discountPercent(offer);
+  const fmt = (n: number) => euro(n).toLocaleString(locale === "en" ? "en-GB" : "sr-Latn-RS");
 
   const tags = [
     ...offer.transport.map((tr) => TRANSPORT_KEYS[tr] && t(TRANSPORT_KEYS[tr])).filter(Boolean),
@@ -46,7 +48,8 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
   const headlineTotal =
     headlinePerPerson != null ? euro(headlinePerPerson * headlineCapacity) : null;
 
-  const coverImage = offer.image ?? getProviderLogo(offer.provider);
+  const [imageFailed, setImageFailed] = useState(false);
+  const coverImage = imageFailed ? undefined : offer.image ?? getProviderLogo(offer.provider);
   const isAgencyLogo = !offer.image && Boolean(coverImage);
   const showLocation =
     offer.location &&
@@ -57,162 +60,145 @@ export default function OfferCard({ offer, people }: { offer: Offer; people: num
   const hiddenRoomCount = roomOptions.length - visibleRooms.length;
 
   return (
-    <article className="offer-card group">
-      <a
-        href={offer.sourceUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="offer-card-link"
+    <a
+      href={offer.sourceUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="lm-offer group"
+    >
+      <div
+        className={`relative aspect-[16/10] shrink-0 overflow-hidden ${
+          coverImage ? (isAgencyLogo ? "bg-white" : "bg-surface-2") : "lm-photo-fallback"
+        }`}
       >
-        <div className="relative h-44 shrink-0 overflow-hidden surface-muted">
-          {coverImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverImage}
-              alt={isAgencyLogo ? offer.sourceLabel : offer.title}
-              className={
-                isAgencyLogo
-                  ? "h-full w-full bg-zinc-100 object-contain p-7"
-                  : "h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
-              }
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <span className="text-sm text-theme-muted">{offer.sourceLabel}</span>
-            </div>
-          )}
+        {coverImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={coverImage}
+            alt={isAgencyLogo ? offer.sourceLabel : offer.title}
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+            className={
+              isAgencyLogo
+                ? "h-full w-full object-contain p-8"
+                : "h-full w-full object-cover transition duration-700 group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+            }
+          />
+        )}
 
-          {!isAgencyLogo && (
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090b]/75 via-transparent to-transparent" />
-          )}
+        {discount != null && (
+          <span className="lm-badge lm-badge--deal absolute left-3 top-3">−{discount}%</span>
+        )}
 
-          {discount != null && (
-            <span className="absolute left-3 top-3 rounded-md bg-[color-mix(in_srgb,var(--success)_85%,#166534)] px-2 py-0.5 text-[11px] font-bold text-[var(--primary-fg)]">
-              −{discount}%
+        <span className="lm-badge lm-badge--source absolute bottom-3 left-3 max-w-[75%] truncate">
+          {offer.sourceLabel}
+        </span>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-4">
+        <h3 className="line-clamp-2 text-base font-semibold leading-[22px] tracking-tight text-ink">
+          {offer.title}
+        </h3>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] leading-[18px] text-ink-muted">
+          {showLocation && (
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <MapPin size={14} className="shrink-0 text-primary" aria-hidden />
+              <span className="line-clamp-1">{offer.location}</span>
             </span>
           )}
-
-          <span className="absolute bottom-3 left-3 max-w-[70%] truncate rounded-md border border-[var(--border)] bg-[var(--surface-overlay)] px-2 py-0.5 text-[11px] font-medium text-theme backdrop-blur-sm">
-            {offer.sourceLabel}
-          </span>
+          {offer.dateRange && (
+            <span className="inline-flex items-center gap-1">
+              <CalendarDays size={14} className="shrink-0 text-primary" aria-hidden />
+              {offer.dateRange}
+            </span>
+          )}
+          {offer.nights && <span className="lm-badge lm-badge--brand">{offer.nights}</span>}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-          <div className="min-h-[5.5rem] space-y-2">
-            <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight text-theme">
-              {offer.title}
-            </h3>
-
-            <div className="space-y-1.5">
-              {showLocation && (
-                <p className="flex items-center gap-1.5 text-xs text-theme-muted">
-                  <MapPin size={12} className="shrink-0 text-primary" />
-                  <span className="line-clamp-1">{offer.location}</span>
-                </p>
-              )}
-              {offer.dateRange && (
-                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-theme-muted">
-                  <CalendarDays size={12} className="shrink-0 text-primary" />
-                  <span>{offer.dateRange}</span>
-                  {offer.nights && (
-                    <span className="nights-badge">{offer.nights}</span>
-                  )}
-                </p>
-              )}
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {tags.map((tag) => (
-                    <span key={tag} className="tag-brand">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <span key={tag} className="lm-badge lm-badge--neutral">
+                {tag}
+              </span>
+            ))}
           </div>
+        )}
 
-          {offer.description && (
-            <p className="line-clamp-2 text-xs leading-relaxed text-theme-subtle">
-              {offer.description}
-            </p>
-          )}
+        {offer.description && (
+          <p className="line-clamp-2 text-[13px] leading-5 text-ink-subtle">{offer.description}</p>
+        )}
 
-          {visibleRooms.length > 0 && (
-            <div className="divide-y divide-[var(--border-muted)] overflow-hidden rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-muted)_40%,transparent)]">
-              {visibleRooms.map((r) => (
-                <div
-                  key={r.label}
-                  className="flex items-center justify-between gap-2 px-3 py-2"
-                >
-                  <span className="line-clamp-1 flex-1 text-xs text-theme-muted">{r.label}</span>
-                  <div className="flex shrink-0 items-center gap-2">
+        {visibleRooms.length > 0 && (
+          <div className="lm-rooms mt-1">
+            {visibleRooms.map((r) => {
+              const isBest = bestRoom?.room.label === r.label;
+              return (
+                <div key={r.label} className={`lm-rooms__row ${isBest ? "text-ink" : ""}`}>
+                  <span className="line-clamp-1 flex-1">{r.label}</span>
+                  <span className="flex shrink-0 items-center gap-2">
                     {r.transportIncluded === true && (
-                      <Bus
-                        size={12}
-                        className="text-primary"
-                        aria-label={t("offer.transportIncluded")}
-                      />
+                      <Bus size={13} className="text-primary" aria-label={t("offer.transportIncluded")} />
                     )}
                     {r.transportIncluded === false && (
-                      <Car
-                        size={12}
-                        className="text-theme-subtle"
-                        aria-label={t("offer.ownTransport")}
-                      />
+                      <Car size={13} className="text-ink-subtle" aria-label={t("offer.ownTransport")} />
                     )}
-                    <span className="text-xs font-semibold tabular-nums text-theme">
-                      {euro(r.price)} €
-                    </span>
-                  </div>
+                    <b className={`whitespace-nowrap font-semibold tabular ${isBest ? "text-primary" : "text-ink"}`}>
+                      {fmt(r.price)} €
+                    </b>
+                  </span>
                 </div>
-              ))}
-              {hiddenRoomCount > 0 && (
-                <p className="px-3 py-1.5 text-[11px] text-theme-subtle">
-                  {t("offer.moreRooms", { count: hiddenRoomCount })}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="mt-auto border-t border-[var(--border)] pt-3">
-            {headlineTotal != null ? (
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  {offer.oldPricePerPerson && headlinePerPerson != null && (
-                    <p className="text-xs tabular-nums text-theme-subtle line-through">
-                      {euro(offer.oldPricePerPerson)} € {t("offer.perPerson")}
-                    </p>
-                  )}
-                  <p className="text-sm font-medium tabular-nums text-theme-muted">
-                    {headlinePerPerson != null ? euro(headlinePerPerson) : "?"} €
-                    <span className="font-normal text-theme-subtle"> {t("offer.perPerson")}</span>
-                  </p>
-                  <p className="mt-0.5 text-xs text-theme-subtle">
-                    {t("offer.totalFor", {
-                      count: headlineCapacity,
-                      people: peopleWord(headlineCapacity, locale),
-                    })}
-                  </p>
-                </div>
-                <p className="text-2xl font-bold tabular-nums tracking-tight text-gradient-price">
-                  {headlineTotal} €
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-theme-muted">{t("offer.priceOnRequest")}</p>
-            )}
-
-            {bestRoom && !bestRoom.fits && bestRoom.capacity != null && (
-              <p className="mt-2 text-xs leading-snug text-warning">
-                {t("offer.roomTooSmall", {
-                  capacity: bestRoom.capacity,
-                  people: peopleWord(bestRoom.capacity, locale),
-                })}
+              );
+            })}
+            {hiddenRoomCount > 0 && (
+              <p className="border-t border-line px-3 py-1.5 text-xs text-ink-subtle">
+                {t("offer.moreRooms", { count: hiddenRoomCount })}
               </p>
             )}
           </div>
+        )}
+
+        <div className="mt-auto border-t border-line pt-3">
+          {headlineTotal != null ? (
+            <div className="flex items-end justify-between gap-3">
+              <div className="text-[13px] leading-[18px]">
+                {offer.oldPricePerPerson && headlinePerPerson != null && (
+                  <p className="tabular text-ink-subtle line-through">
+                    {fmt(offer.oldPricePerPerson)} € {t("offer.perPerson")}
+                  </p>
+                )}
+                <p className="font-medium tabular text-ink-muted">
+                  {headlinePerPerson != null ? fmt(headlinePerPerson) : "?"} € {t("offer.perPerson")}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-display text-[28px] font-bold leading-8 tracking-[-0.02em] tabular text-ink">
+                  {headlineTotal.toLocaleString(locale === "en" ? "en-GB" : "sr-Latn-RS")} €
+                </p>
+                <p className="text-xs text-ink-subtle">
+                  {t("offer.totalFor", {
+                    count: headlineCapacity,
+                    people: peopleWord(headlineCapacity, locale),
+                  })}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-ink-muted">{t("offer.priceOnRequest")}</p>
+          )}
+
+          {bestRoom && !bestRoom.fits && bestRoom.capacity != null && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs leading-snug text-warning">
+              <AlertTriangle size={13} className="mt-px shrink-0" aria-hidden />
+              {t("offer.roomTooSmall", {
+                capacity: bestRoom.capacity,
+                people: peopleWord(bestRoom.capacity, locale),
+              })}
+            </p>
+          )}
         </div>
-      </a>
-    </article>
+      </div>
+    </a>
   );
 }
