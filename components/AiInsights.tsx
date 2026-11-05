@@ -39,6 +39,7 @@ export default function AiInsights({
   const { locale, t } = useAppPreferences();
   const [status, setStatus] = useState<Status>("checking");
   const [errorKind, setErrorKind] = useState<"rate" | "busy" | "config" | "other">("other");
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analyzed, setAnalyzed] = useState<Offer[]>([]);
   const [prefs, setPrefs] = useState("");
@@ -55,8 +56,9 @@ export default function AiInsights({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...context, locale, preferences, offers: batch }),
         });
-        const data = (await res.json()) as { analysis?: AiAnalysis; error?: string };
+        const data = (await res.json()) as { analysis?: AiAnalysis; error?: string; message?: string };
         if (!res.ok || !data.analysis) {
+          setErrorDetail(data.message?.match(/\[(.*)\]/)?.[1] ?? data.message ?? null);
           setErrorKind(
             data.error === "rate_limited"
               ? "rate"
@@ -187,8 +189,9 @@ export default function AiInsights({
       )}
 
       {status === "error" && (
-        <p className="lm-callout lm-callout--warning" role="alert">
+        <div className="lm-callout lm-callout--warning" role="alert">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+          <div className="min-w-0">
           {errorKind === "rate"
             ? t("ai.rateLimited")
             : errorKind === "busy"
@@ -196,7 +199,14 @@ export default function AiInsights({
               : errorKind === "config"
                 ? t("ai.notConfigured")
                 : t("ai.error")}
-        </p>
+            {errorDetail && (
+              <details className="mt-1 text-xs">
+                <summary className="cursor-pointer font-semibold">{t("search.errorDetails")}</summary>
+                <p className="mt-1 break-words">{errorDetail}</p>
+              </details>
+            )}
+          </div>
+        </div>
       )}
 
       {analysis && status !== "loading" && (

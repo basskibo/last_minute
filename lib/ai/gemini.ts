@@ -42,11 +42,54 @@ export function isGeminiConfigured(): boolean {
 /** Modeli koji su vratili 404 — ne pokušavamo ih ponovo dok instanca živi. */
 const missingModels = new Set<string>();
 
-function modelCandidates(): string[] {
+/**
+ * Lista Flash modela dostupnih ZA OVAJ KLJUČ (Google ListModels), da ne
+ * nagađamo nazive koji se menjaju. Keš po instanci, 6 h.
+ * Redosled: stabilni (ne-preview) od najnovije verzije, Flash pre Flash-Lite;
+ * preview modeli na kraju.
+ */
+let listedCache: { at: number; models: string[] } | null = null;
+
+async function listFlashModels(key: string): Promise<string[]> {
+  if (listedCache && Date.now() - listedCache.at < 6 * 3600_000) return listedCache.models;
+  try {
+    const res = await fetch(`${API_BASE}?pageSize=200`, {
+      headers: { "x-goog-api-key": key },
+      signal: AbortSignal.timeout(4000),
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      models?: { name?: string; supportedGenerationMethods?: string[] }[];
+    };
+    const version = (m: string) => parseFloat(m.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? "0");
+    const models = (data.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m) => (m.name ?? "").replace(/^models\//, ""))
+      .filter((m) => /^gemini-[\d.]+-flash/.test(m))
+      .filter((m) => !/image|tts|audio|live|embedding|exp|thinking|computer|robotics/.test(m))
+      .sort((a, b) => {
+        const preview = Number(a.includes("preview")) - Number(b.includes("preview"));
+        if (preview) return preview;
+        const v = version(b) - version(a);
+        if (v) return v;
+        return Number(a.includes("lite")) - Number(b.includes("lite"));
+      });
+    listedCache = { at: Date.now(), models };
+    return models;
+  } catch {
+    return [];
+  }
+}
+
+async function modelCandidates(key: string): Promise<string[]> {
   const preferred = process.env.GEMINI_MODEL?.trim();
-  return [...new Set([preferred, ...FALLBACK_MODELS].filter(Boolean) as string[])].filter(
-    (m) => !missingModels.has(m)
-  );
+  const listed = await listFlashModels(key);
+  const stable = listed.filter((m) => !m.includes("preview"));
+  const preview = listed.filter((m) => m.includes("preview"));
+  return [...new Set([preferred, ...stable, ...FALLBACK_MODELS, ...preview].filter(Boolean) as string[])]
+    .filter((m) => !missingModels.has(m))
+    .slice(0, 6);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -74,7 +117,8 @@ export async function generateJson<T>({
   const key = geminiApiKey();
   if (!key) throw new GeminiError("GEMINI_API_KEY nije podešen.", "not_configured");
 
-  const models = modelCandidates();
+  const models = await modelCandidates(key);
+  const attempts: string[] = [];
   // Ukupni budžet za sve pokušaje (ruta ima maxDuration 60 s).
   const deadline = Date.now() + budgetMs;
 
@@ -82,10 +126,14 @@ export async function generateJson<T>({
   let sawRateLimit = false;
   let sawOverload = false;
 
-  for (const [i, model] of models.entries()) {
+  // Svaki model najviše 2 puta (drugi put samo posle 503 — preopterećenje
+  // je često kratko), pa sledeći model.
+  const queue = models.map((model) => ({ model, retry: true }));
+  for (let i = 0; i < queue.length; i++) {
+    const { model, retry } = queue[i];
     const remaining = deadline - Date.now();
     if (remaining < 1500) break;
-    if (i > 0 && (sawOverload || sawRateLimit)) await sleep(500);
+    if (i > 0 && (sawOverload || sawRateLimit)) await sleep(retry ? 400 : 1200);
 
     const res = await fetch(`${API_BASE}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
@@ -106,7 +154,11 @@ export async function generateJson<T>({
       return null;
     });
 
-    if (!res) continue; // timeout / mreža → sledeći model
+    if (!res) {
+      attempts.push(`${model}: timeout/mreža`);
+      continue; // → sledeći model
+    }
+    if (!res.ok) attempts.push(`${model}: ${res.status}`);
 
     if (res.status === 404) {
       missingModels.add(model);
@@ -121,6 +173,7 @@ export async function generateJson<T>({
     if (res.status === 500 || res.status === 502 || res.status === 503 || res.status === 504) {
       sawOverload = true;
       lastError = new Error(`${model}: HTTP ${res.status}`);
+      if (retry && res.status === 503) queue.splice(i + 1, 0, { model, retry: false });
       continue;
     }
     if (!res.ok) {
@@ -135,19 +188,26 @@ export async function generateJson<T>({
     try {
       return JSON.parse(text) as T;
     } catch {
+      attempts.push(`${model}: neispravan JSON`);
       lastError = new Error(`${model}: neispravan JSON`);
       continue;
     }
   }
 
   if (sawOverload) {
-    throw new GeminiError("Gemini modeli su trenutno preopterećeni — probaj ponovo za koji minut.", "overloaded");
+    throw new GeminiError(
+      `Gemini modeli su trenutno preopterećeni — probaj ponovo za koji minut. [${attempts.join(", ")}]`,
+      "overloaded"
+    );
   }
   if (sawRateLimit) {
-    throw new GeminiError("Dostignut je limit besplatnog Gemini plana — probaj za minut.", "rate_limited");
+    throw new GeminiError(
+      `Dostignut je limit besplatnog Gemini plana — probaj za minut. [${attempts.join(", ")}]`,
+      "rate_limited"
+    );
   }
   throw new GeminiError(
-    `Nijedan Gemini model nije dostupan (${models.join(", ")}): ${String(
+    `Nijedan Gemini model nije uspeo [${attempts.join(", ")}]: ${String(
       (lastError as Error)?.message ?? lastError
     )}`,
     "failed"

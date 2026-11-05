@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { Offer, Provider, SearchParams } from "./types";
-import { launchBrowser } from "../browser";
+import { acquireBrowserContext } from "../browser";
 import { normalizeDestinationKey, parsePriceEur } from "./scrape-utils";
 
 const BASE_URL = "https://www.filiptravel.rs";
@@ -55,14 +55,12 @@ function parseOffers(html: string, country: string): Offer[] {
 
 export async function searchFilipTravel(params: SearchParams): Promise<Offer[]> {
   const destKey = normalizeDestinationKey(params.destination);
-  const browser = await launchBrowser();
+  // Deli isti Chromium sa Booking/Airbnb (vidi lib/browser.ts) — tri
+  // odvojena browsera bi na serverless funkciji lako potrošila memoriju.
+  const { context, release } = await acquireBrowserContext();
 
   try {
-    const page = await browser.newPage({
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      locale: "sr-RS",
-    });
+    const page = await context.newPage();
 
     const paths = [`/`, `/destinacije/${destKey}`, `/last-minute`, `/ponude`];
     const offers: Offer[] = [];
@@ -94,7 +92,7 @@ export async function searchFilipTravel(params: SearchParams): Promise<Offer[]> 
 
     return offers;
   } finally {
-    await browser.close();
+    await release();
   }
 }
 

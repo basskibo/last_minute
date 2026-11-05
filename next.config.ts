@@ -3,24 +3,27 @@ import path from "node:path";
 import type { NextConfig } from "next";
 
 /**
- * Chromium za Booking/Airbnb na Vercelu: @sparticuz/chromium ga nosi kao
- * kompresovane binarne fajlove u `bin/` (chromium.br ~66 MB, al2023.tar.br…).
- * Next file tracing prati samo `require`-ovane JS fajlove, pa `bin/` NIJE
- * ulazio u serverless funkciju → Chromium nije mogao da se pokrene i
- * Booking/Airbnb su na produkciji uvek padali.
+ * Booking/Airbnb (headless browser) na Vercelu. Next file tracing prati samo
+ * `require`-ovane JS fajlove, a ova dva paketa čitaju i fajlove sa diska:
+ * - @sparticuz/chromium: `bin/` (chromium.br ~66 MB, al2023.tar.br…)
+ * - playwright-core: `browsers.json` (čita ga pri učitavanju modula)
+ * Bez njih funkcija na Vercelu pada ("input directory … bin does not
+ * exist" / "Cannot find module … playwright-core/browsers.json").
  *
- * Uključujemo `bin/` sa PRAVE putanje paketa (kod pnpm-a je
- * node_modules/@sparticuz/chromium samo symlink ka .pnpm/...), tako da se
- * ~70 MB spakuje tačno jednom, a ne dvaput preko symlinka.
+ * Fajlove uključujemo sa PRAVE putanje paketa (kod pnpm-a je
+ * node_modules/<paket> samo symlink ka .pnpm/...), da se spakuju jednom.
  */
-function chromiumBinGlob(): string[] {
-  const linked = path.join(process.cwd(), "node_modules", "@sparticuz", "chromium");
+function packageGlob(name: string, pattern: string): string[] {
+  const linked = path.join(process.cwd(), "node_modules", ...name.split("/"));
   if (!existsSync(linked)) return [];
   const real = path.relative(process.cwd(), realpathSync(linked)).split(path.sep).join("/");
-  return [`./${real}/bin/**/*`];
+  return [`./${real}/${pattern}`];
 }
 
-const CHROMIUM_BIN = chromiumBinGlob();
+const BROWSER_FILES = [
+  ...packageGlob("@sparticuz/chromium", "bin/**/*"),
+  ...packageGlob("playwright-core", "**/*"),
+];
 
 const nextConfig: NextConfig = {
   // playwright-core i @sparticuz/chromium nose native binarne fajlove —
@@ -28,8 +31,8 @@ const nextConfig: NextConfig = {
   // upakovali (i pronašli u runtime-u) na Vercel serverless funkciji.
   serverExternalPackages: ["playwright-core", "@sparticuz/chromium"],
   outputFileTracingIncludes: {
-    "/api/search": CHROMIUM_BIN,
-    "/api/search/stream": CHROMIUM_BIN,
+    "/api/search": BROWSER_FILES,
+    "/api/search/stream": BROWSER_FILES,
   },
 };
 
