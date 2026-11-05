@@ -330,6 +330,30 @@ export function resolveDestinationLocal(query: string): ResolvedDestination {
   };
 }
 
+
+/** ISO 3166-1 alpha-2 — Booking za države koristi kod kao dest_id (dest_type=country). */
+const COUNTRY_ISO: Record<string, string> = {
+  Andora: "ad", Austrija: "at", "Bosna i Hercegovina": "ba", Bugarska: "bg", Češka: "cz",
+  "Crna Gora": "me", Danska: "dk", Estonija: "ee", Finska: "fi", Francuska: "fr", Grčka: "gr",
+  Holandija: "nl", Hrvatska: "hr", Irska: "ie", Island: "is", Italija: "it", Kipar: "cy",
+  Letonija: "lv", Litvanija: "lt", Makedonija: "mk", Malta: "mt", Mađarska: "hu", Monako: "mc",
+  Nemačka: "de", Norveška: "no", Poljska: "pl", Portugalija: "pt", Rumunija: "ro", Rusija: "ru",
+  "San Marino": "sm", Škotska: "gb", Slovačka: "sk", Slovenija: "si", Španija: "es", Srbija: "rs",
+  Švajcarska: "ch", Švedska: "se", Turska: "tr", "Velika Britanija": "gb", Alžir: "dz", Egipat: "eg",
+  Kenija: "ke", Maroko: "ma", Mauricijus: "mu", Sejšeli: "sc", Tanzanija: "tz", Tunis: "tn",
+  Brunej: "bn", Filipini: "ph", Indija: "in", Indonezija: "id", Japan: "jp", "Južna Koreja": "kr",
+  Kazahstan: "kz", Kina: "cn", Kirgistan: "kg", Maldivi: "mv", Malezija: "my", Oman: "om",
+  Singapur: "sg", "Šri Lanka": "lk", Tajland: "th", "Ujedinjeni Arapski Emirati": "ae",
+  Vijetnam: "vn", Australija: "au", Aljaska: "us", Bahami: "bs", Barbados: "bb",
+  "Dominikanska Republika": "do", Kanada: "ca", Kuba: "cu", Meksiko: "mx", Portoriko: "pr",
+  "Sjedinjene Američke Države": "us", Argentina: "ar", Bolivija: "bo", Brazil: "br", Čile: "cl",
+  Honduras: "hn", Kolumbija: "co", Peru: "pe", Urugvaj: "uy", Albanija: "al",
+};
+
+export function countryIsoCode(country?: string): string | undefined {
+  return country ? COUNTRY_ISO[country] : undefined;
+}
+
 export function countryEnglishName(country: string): string | undefined {
   return COUNTRY_EN[country];
 }

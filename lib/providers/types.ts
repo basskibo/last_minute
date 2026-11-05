@@ -17,6 +17,10 @@ export interface SearchParams {
    * umesto `destination`.
    */
   bookingQuery?: string;
+  /** ISO kod države (npr. "at") — Booking dest_id za pretragu cele države */
+  countryCode?: string;
+  /** true = traženo je konkretno mesto (grad/ostrvo), a ne cela država */
+  isPlace?: boolean;
 }
 
 export interface RoomOption {

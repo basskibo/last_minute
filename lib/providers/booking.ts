@@ -118,46 +118,87 @@ interface BookingDest {
 /** dest_id po upitu — Booking ID-jevi se ne menjaju, čuvamo ih dok instanca živi. */
 const destCache = new Map<string, BookingDest>();
 
+/** Rekurzivno nađe prvi objekat sa dest_id/dest_type (JSON) ili destId/destType (GraphQL). */
+function findDest(node: unknown, depth = 0): BookingDest | undefined {
+  if (!node || typeof node !== "object" || depth > 12) return undefined;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const hit = findDest(item, depth + 1);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+  const o = node as Record<string, unknown>;
+  const id = o.dest_id ?? o.destId;
+  const type = o.dest_type ?? o.destType;
+  if ((typeof id === "string" || typeof id === "number") && typeof type === "string" && String(id)) {
+    const label = o.label ?? o.value ?? o.title;
+    return { dest_id: String(id), dest_type: type.toLowerCase(), label: typeof label === "string" ? label : undefined };
+  }
+  for (const value of Object.values(o)) {
+    const hit = findDest(value, depth + 1);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 /**
- * Booking-ova pretraga traži interni ID destinacije (dest_id + dest_type),
- * koji njihov sajt dobija iz servisa za predloge dok korisnik kuca. Sam
- * tekst `ss=Paris` sa servera daje "0 properties are available in and
- * around this destination". Zovemo isti servis IZ već otvorene Booking
- * strane (isti kolačići i WAF token kao pravi posetilac).
+ * dest_id za mesto, onako kako ga dobija pravi posetilac: otvori Booking
+ * početnu, ukuca mesto u njihovo polje i PRESRETNE odgovor koji dobije
+ * Booking-ov sopstveni JavaScript. (Naš direktan poziv servisa za predloge
+ * je sa Vercela dobijao 403 — njihov zahtev nosi zaglavlja/tokene sajta.)
  */
-async function resolveBookingDest(
+async function resolveViaSite(
   page: Page,
-  query: string
+  query: string,
+  deadline: number
 ): Promise<{ dest?: BookingDest; error?: string }> {
-  const key = query.toLowerCase();
-  const cached = destCache.get(key);
+  const cached = destCache.get(query.toLowerCase());
   if (cached) return { dest: cached };
 
-  const result = await page
-    .evaluate(async (q) => {
-      try {
-        const res = await fetch("https://accommodations.booking.com/autocomplete.json", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ query: q, language: "en-us", size: 5 }),
-        });
-        if (!res.ok) return { error: `autocomplete HTTP ${res.status}` };
-        const data = (await res.json()) as {
-          results?: { dest_id?: string | number; dest_type?: string; label?: string; value?: string }[];
-        };
-        const hit = (data.results ?? []).find((r) => r.dest_id != null && r.dest_type);
-        return hit
-          ? { dest: { dest_id: String(hit.dest_id), dest_type: String(hit.dest_type), label: hit.label ?? hit.value } }
-          : { error: `autocomplete bez rezultata (${(data.results ?? []).length})` };
-      } catch (err) {
-        return { error: `autocomplete: ${String(err).slice(0, 80)}` };
-      }
-    }, query)
-    .catch((err: unknown) => ({ error: `autocomplete: ${String(err).slice(0, 80)}` }) as { dest?: BookingDest; error?: string });
+  let found: BookingDest | undefined;
+  const statuses: string[] = [];
+  const onResponse = async (res: import("playwright-core").Response) => {
+    if (found || !/autocomplete|graphql/i.test(res.url())) return;
+    if (res.request().method() === "OPTIONS") return;
+    statuses.push(String(res.status()));
+    if (!res.ok()) return;
+    try {
+      found ??= findDest(await res.json());
+    } catch {
+      /* nije JSON */
+    }
+  };
+  page.on("response", onResponse);
 
-  if (result.dest) destCache.set(key, result.dest);
-  return result;
+  try {
+    await page.goto("https://www.booking.com/index.html?lang=en-us&selected_currency=EUR", {
+      waitUntil: "domcontentloaded",
+      timeout: 15000,
+    });
+    await page.locator("#onetrust-accept-btn-handler").click({ timeout: 1500 }).catch(() => null);
+    const input = page.locator('input[name="ss"]').first();
+    await input.click({ timeout: 5000 });
+    await input.fill("");
+    await input.pressSequentially(query, { delay: 70 });
+
+    const until = Math.min(deadline - 12000, Date.now() + 8000);
+    while (!found && Date.now() < until) await page.waitForTimeout(250);
+  } catch (err) {
+    return { error: `polje za pretragu: ${String((err as Error)?.message ?? err).split("\n")[0].slice(0, 100)}` };
+  } finally {
+    page.off("response", onResponse);
+  }
+
+  if (found) {
+    destCache.set(query.toLowerCase(), found);
+    return { dest: found };
+  }
+  return {
+    error: statuses.length
+      ? `predlozi sa sajta bez dest_id (HTTP ${[...new Set(statuses)].join("/")})`
+      : "sajt nije pozvao servis za predloge",
+  };
 }
 
 export async function searchBooking(params: SearchParams): Promise<Offer[]> {
@@ -191,30 +232,35 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
     const deadline = Date.now() + BOOKING_BUDGET_MS;
     const page = await context.newPage();
 
-    // 1) Poznat dest_id (keš) → direktno. Inače prvo tekstualna pretraga,
-    //    koja ujedno otvori Booking i postavi WAF token.
-    let dest = destCache.get(ss.toLowerCase());
-    let raw: RawCard[] = await scrapePage(page, buildUrl(0, dest), deadline, false);
-    let destError: string | undefined;
-
-    // 2) Nema hotela → uzmi dest_id iz Booking-ovog servisa za predloge.
-    if (raw.length === 0 && !dest && deadline - Date.now() > 8000) {
-      const resolved = await resolveBookingDest(page, ss);
-      dest = resolved.dest;
-      destError = resolved.error;
-      if (dest) raw = await scrapePage(page, buildUrl(0, dest), deadline, true);
+    // 1) Cela država → dest_id je ISO kod (bez ikakvog poziva).
+    // 2) Mesto → dest_id iz predloga koje Booking-ov sajt sam dobije.
+    // 3) Mesto bez dest_id → pretraga cele države (ponude za mesto idu na
+    //    vrh u lib/search.ts), pa tek onda tekstualna pretraga.
+    let dest: BookingDest | undefined = destCache.get(ss.toLowerCase());
+    let destNote = dest ? "keš" : "";
+    if (!dest && !params.isPlace && params.countryCode) {
+      dest = { dest_id: params.countryCode, dest_type: "country" };
+      destNote = "kod države";
+    }
+    if (!dest && deadline - Date.now() > 15000) {
+      const viaSite = await resolveViaSite(page, ss, deadline);
+      dest = viaSite.dest;
+      destNote = viaSite.dest ? "predlozi sa sajta" : `predlozi: ${viaSite.error}`;
+    }
+    if (!dest && params.countryCode) {
+      dest = { dest_id: params.countryCode, dest_type: "country" };
+      destNote += "; rezerva: cela država";
     }
 
-    // 3) I dalje ništa, a dest_id nemamo → ponovo tekstualna pretraga sada
-    //    kad je WAF token postavljen (hoteli ponekad stižu tek tada).
-    if (raw.length === 0 && !dest && deadline - Date.now() > 8000) {
-      raw = await scrapePage(page, buildUrl(0), deadline, true);
+    let raw: RawCard[] = await scrapePage(page, buildUrl(0, dest), deadline, true);
+    if (raw.length === 0 && dest && deadline - Date.now() > 8000) {
+      raw = await scrapePage(page, buildUrl(0), deadline, false);
     }
 
     if (raw.length === 0) {
       const destInfo = dest
-        ? `dest_id ${dest.dest_id} (${dest.dest_type}${dest.label ? `, ${dest.label}` : ""})`
-        : `dest_id nije pronađen — ${destError ?? "nije pokušano"}`;
+        ? `dest_id ${dest.dest_id} (${dest.dest_type}${dest.label ? `, ${dest.label}` : ""}; ${destNote})`
+        : `dest_id nije pronađen (${destNote || "nije pokušano"})`;
       throw new Error(`Booking: ${destInfo}; ${await describeEmptyPage(page)}`);
     }
 

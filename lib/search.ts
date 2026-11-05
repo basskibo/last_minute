@@ -2,7 +2,7 @@ import { providers as allProviders } from "./providers";
 import type { Offer, SearchParams } from "./providers/types";
 import { buildCacheKey, getCached, setCached } from "./cache";
 import { mergeOffers, prioritizeMonth, sortOffers, type SortOption } from "./normalize";
-import { offerMentionsPlace, type DestinationEntry } from "./destinations";
+import { countryIsoCode, offerMentionsPlace, type DestinationEntry } from "./destinations";
 import { resolveDestination } from "./ai/resolve-destination";
 import { monthOf } from "./dates";
 
@@ -119,7 +119,12 @@ export async function performSearchStreaming(
     bookingQuery: resolved.bookingQuery,
   };
   const countryParams: SearchParams = { ...params, destination: resolved.country ?? params.destination };
-  const placeParams: SearchParams = { ...params, bookingQuery: resolved.bookingQuery };
+  const placeParams: SearchParams = {
+    ...params,
+    bookingQuery: resolved.bookingQuery,
+    countryCode: countryIsoCode(resolved.country),
+    isPlace: Boolean(resolved.place),
+  };
   if (cached) {
     let offersSoFar = 0;
     cached.providerStatus.forEach((provider, i) => {
