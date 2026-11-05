@@ -1,6 +1,6 @@
 import type { Page } from "playwright-core";
 import type { Offer, Provider, SearchParams } from "./types";
-import { acquireBrowserContext } from "../browser";
+import { acquireBrowserContext, describeEmptyPage } from "../browser";
 import { pickStayDates, formatDateRange } from "../dates";
 
 /**
@@ -90,8 +90,11 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
     const pages = await Promise.all(urls.map(() => context.newPage()));
     const settled = await Promise.allSettled(urls.map((u, i) => scrapePage(pages[i], u)));
     const raw = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
-    if (raw.length === 0 && settled.every((r) => r.status === "rejected")) {
-      throw (settled[0] as PromiseRejectedResult).reason;
+    if (raw.length === 0) {
+      if (settled.every((r) => r.status === "rejected")) {
+        throw (settled[0] as PromiseRejectedResult).reason;
+      }
+      throw new Error(`Booking: ${await describeEmptyPage(pages[0])}`);
     }
 
     const people = params.adults + params.children;

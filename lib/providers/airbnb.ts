@@ -1,5 +1,5 @@
 import type { Offer, Provider, SearchParams } from "./types";
-import { acquireBrowserContext } from "../browser";
+import { acquireBrowserContext, describeEmptyPage } from "../browser";
 import { pickStayDates, formatDateRange } from "../dates";
 
 /**
@@ -62,6 +62,8 @@ export async function searchAirbnb(params: SearchParams): Promise<Offer[]> {
         };
       })
     );
+
+    if (raw.length === 0) throw new Error(`Airbnb: ${await describeEmptyPage(page)}`);
 
     const people = params.adults + params.children;
     const dateRange = formatDateRange(checkin, checkout);

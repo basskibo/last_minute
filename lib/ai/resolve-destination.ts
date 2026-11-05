@@ -39,7 +39,8 @@ export async function resolveDestination(query: string): Promise<ResolvedDestina
           required: ["country", "en"],
         },
         temperature: 0,
-        timeoutMs: 6000,
+        timeoutMs: 5000,
+        budgetMs: 7000,
       });
       if (answer.country && !COUNTRY_NAMES.includes(answer.country)) answer.country = null;
       await setCached(cacheKey, answer, 60 * 60 * 24 * 30);

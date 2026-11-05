@@ -13,7 +13,7 @@ export function buildCacheKey(params: SearchParams): string {
   // zavisi od broja osoba — zato mesec i broj gostiju ulaze u ključ.
   const dest = params.destination.trim().toLowerCase();
   const period = params.checkin && params.checkout ? `${params.checkin}_${params.checkout}` : params.month ?? "any";
-  return `search:v2:${dest}:${period}:${params.adults}:${params.children}`;
+  return `search:v3:${dest}:${period}:${params.adults}:${params.children}`;
 }
 
 export async function getCached<T>(key: string): Promise<T | null> {

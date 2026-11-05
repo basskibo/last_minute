@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@radix-ui/themes": "^3.3.0",
-    "@sparticuz/chromium": "^149.0.0",
+    "@sparticuz/chromium": "152.0.0",
     "@upstash/redis": "^1.38.2",
     "cheerio": "^1.2.0",
     "lucide-react": "^1.29.0",

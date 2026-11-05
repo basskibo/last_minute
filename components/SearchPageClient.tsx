@@ -273,14 +273,29 @@ export default function SearchPageClient({
               />
 
               {result.errors.length > 0 && (
-                <p className="lm-callout lm-callout--warning">
+                <div className="lm-callout lm-callout--warning">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
-                  {t("search.sourcesPartial", {
-                    sources: result.errors
-                      .map((e) => result.providerStatus.find((p) => p.id === e.provider)?.label ?? e.provider)
-                      .join(", "),
-                  })}
-                </p>
+                  <div className="min-w-0">
+                    <p>
+                      {t("search.sourcesPartial", {
+                        sources: result.errors
+                          .map((e) => result.providerStatus.find((p) => p.id === e.provider)?.label ?? e.provider)
+                          .join(", "),
+                      })}
+                    </p>
+                    <details className="mt-1 text-xs">
+                      <summary className="cursor-pointer font-semibold">{t("search.errorDetails")}</summary>
+                      <ul className="mt-1 flex flex-col gap-1">
+                        {result.errors.map((e) => (
+                          <li key={e.provider} className="break-words">
+                            <b>{result.providerStatus.find((p) => p.id === e.provider)?.label ?? e.provider}:</b>{" "}
+                            {e.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </div>
+                </div>
               )}
 
               {place && country && place !== country && (

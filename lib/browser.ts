@@ -82,3 +82,25 @@ export async function acquireBrowserContext(): Promise<{
     },
   };
 }
+
+/**
+ * Kad sajt ne vrati nijednu karticu, opiše šta je zapravo učitano — da se
+ * u UI-ju i Vercel logovima vidi razlog (anti-bot provera, prazna strana,
+ * promenjen HTML) umesto tihog "0 rezultata".
+ */
+export async function describeEmptyPage(page: import("playwright-core").Page): Promise<string> {
+  try {
+    const title = (await page.title()).slice(0, 80);
+    const url = new URL(page.url());
+    const html = (await page.content()).slice(0, 300_000);
+    const blocked =
+      /awswaf|captcha|challenge-platform|verify (that )?you are (a )?human|are you a robot|just a moment|access denied|unusual traffic/i.test(
+        html
+      );
+    return blocked
+      ? `sajt je vratio anti-bot proveru umesto rezultata (naslov: "${title}") — server IP je verovatno blokiran`
+      : `nijedna kartica na strani "${title}" (${url.host}${url.pathname}) — moguće da se HTML promenio`;
+  } catch (err) {
+    return `strana nije učitana (${String((err as Error)?.message ?? err).slice(0, 120)})`;
+  }
+}

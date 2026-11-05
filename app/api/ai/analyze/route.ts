@@ -57,7 +57,7 @@ function sanitize(body: unknown): AiRequest | null {
 
 export async function POST(req: NextRequest) {
   if (!isGeminiConfigured()) {
-    return NextResponse.json({ error: "not_configured" }, { status: 503 });
+    return NextResponse.json({ error: "not_configured" }, { status: 501 });
   }
   if (!sameOrigin(req)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -97,7 +97,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ analysis, cached: false });
   } catch (err) {
     if (err instanceof GeminiError) {
-      const status = err.code === "rate_limited" ? 429 : err.code === "not_configured" ? 503 : 502;
+      const status =
+        err.code === "rate_limited" ? 429 : err.code === "overloaded" ? 503 : err.code === "not_configured" ? 501 : 502;
       return NextResponse.json({ error: err.code, message: err.message }, { status });
     }
     return NextResponse.json({ error: "failed", message: String((err as Error)?.message ?? err) }, { status: 500 });

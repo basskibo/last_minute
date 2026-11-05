@@ -38,7 +38,7 @@ export default function AiInsights({
 }) {
   const { locale, t } = useAppPreferences();
   const [status, setStatus] = useState<Status>("checking");
-  const [errorKind, setErrorKind] = useState<"rate" | "config" | "other">("other");
+  const [errorKind, setErrorKind] = useState<"rate" | "busy" | "config" | "other">("other");
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analyzed, setAnalyzed] = useState<Offer[]>([]);
   const [prefs, setPrefs] = useState("");
@@ -57,7 +57,15 @@ export default function AiInsights({
         });
         const data = (await res.json()) as { analysis?: AiAnalysis; error?: string };
         if (!res.ok || !data.analysis) {
-          setErrorKind(res.status === 429 ? "rate" : res.status === 503 ? "config" : "other");
+          setErrorKind(
+            data.error === "rate_limited"
+              ? "rate"
+              : data.error === "overloaded"
+                ? "busy"
+                : data.error === "not_configured"
+                  ? "config"
+                  : "other"
+          );
           setStatus("error");
           return;
         }
@@ -181,7 +189,13 @@ export default function AiInsights({
       {status === "error" && (
         <p className="lm-callout lm-callout--warning" role="alert">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
-          {errorKind === "rate" ? t("ai.rateLimited") : errorKind === "config" ? t("ai.notConfigured") : t("ai.error")}
+          {errorKind === "rate"
+            ? t("ai.rateLimited")
+            : errorKind === "busy"
+              ? t("ai.busy")
+              : errorKind === "config"
+                ? t("ai.notConfigured")
+                : t("ai.error")}
         </p>
       )}
 

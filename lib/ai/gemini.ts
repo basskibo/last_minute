@@ -10,13 +10,22 @@
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
-/** Alias "-latest" uvek pokazuje na aktuelni Flash model. */
-const FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"];
+/**
+ * Redosled pokušaja. "-latest" aliasi uvek pokazuju na aktuelne Flash
+ * modele; Flash-Lite je rezerva kad je Flash preopterećen (503) ili kad je
+ * potrošena njegova besplatna kvota (429 — kvote su po modelu).
+ */
+const FALLBACK_MODELS = [
+  "gemini-flash-latest",
+  "gemini-flash-lite-latest",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+];
 
 export class GeminiError extends Error {
   constructor(
     message: string,
-    readonly code: "not_configured" | "rate_limited" | "bad_response" | "failed"
+    readonly code: "not_configured" | "rate_limited" | "overloaded" | "bad_response" | "failed"
   ) {
     super(message);
   }
@@ -30,13 +39,17 @@ export function isGeminiConfigured(): boolean {
   return Boolean(geminiApiKey());
 }
 
+/** Modeli koji su vratili 404 — ne pokušavamo ih ponovo dok instanca živi. */
+const missingModels = new Set<string>();
+
 function modelCandidates(): string[] {
   const preferred = process.env.GEMINI_MODEL?.trim();
-  return [...new Set([preferred, ...FALLBACK_MODELS].filter(Boolean) as string[])];
+  return [...new Set([preferred, ...FALLBACK_MODELS].filter(Boolean) as string[])].filter(
+    (m) => !missingModels.has(m)
+  );
 }
 
-/** Model koji je poslednji uspešno odgovorio — da se ne proba 404 svaki put. */
-let workingModel: string | null = null;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface GenerateOptions {
   system: string;
@@ -44,7 +57,10 @@ interface GenerateOptions {
   /** OpenAPI-subset šema za strukturisan JSON odgovor */
   schema: Record<string, unknown>;
   temperature?: number;
+  /** Najduže čekanje jednog pokušaja */
   timeoutMs?: number;
+  /** Ukupno vreme za sve pokušaje (svi modeli zajedno) */
+  budgetMs?: number;
 }
 
 export async function generateJson<T>({
@@ -52,18 +68,25 @@ export async function generateJson<T>({
   prompt,
   schema,
   temperature = 0.3,
-  timeoutMs = 25000,
+  timeoutMs = 20000,
+  budgetMs = 45000,
 }: GenerateOptions): Promise<T> {
   const key = geminiApiKey();
   if (!key) throw new GeminiError("GEMINI_API_KEY nije podešen.", "not_configured");
 
-  const models = workingModel
-    ? [workingModel, ...modelCandidates().filter((m) => m !== workingModel)]
-    : modelCandidates();
+  const models = modelCandidates();
+  // Ukupni budžet za sve pokušaje (ruta ima maxDuration 60 s).
+  const deadline = Date.now() + budgetMs;
 
   let lastError: unknown = null;
+  let sawRateLimit = false;
+  let sawOverload = false;
 
-  for (const model of models) {
+  for (const [i, model] of models.entries()) {
+    const remaining = deadline - Date.now();
+    if (remaining < 1500) break;
+    if (i > 0 && (sawOverload || sawRateLimit)) await sleep(500);
+
     const res = await fetch(`${API_BASE}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -76,21 +99,29 @@ export async function generateJson<T>({
           responseSchema: schema,
         },
       }),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.timeout(Math.min(timeoutMs, remaining)),
       cache: "no-store",
     }).catch((err: unknown) => {
       lastError = err;
       return null;
     });
 
-    if (!res) continue;
+    if (!res) continue; // timeout / mreža → sledeći model
 
     if (res.status === 404) {
+      missingModels.add(model);
       lastError = new Error(`Model ${model} nije dostupan`);
       continue;
     }
     if (res.status === 429) {
-      throw new GeminiError("Dostignut je limit besplatnog Gemini plana — probaj za minut.", "rate_limited");
+      sawRateLimit = true;
+      lastError = new Error(`${model}: 429`);
+      continue;
+    }
+    if (res.status === 500 || res.status === 502 || res.status === 503 || res.status === 504) {
+      sawOverload = true;
+      lastError = new Error(`${model}: HTTP ${res.status}`);
+      continue;
     }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -102,14 +133,19 @@ export async function generateJson<T>({
     };
     const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
     try {
-      const parsed = JSON.parse(text) as T;
-      workingModel = model;
-      return parsed;
+      return JSON.parse(text) as T;
     } catch {
-      throw new GeminiError("Gemini je vratio neispravan JSON.", "bad_response");
+      lastError = new Error(`${model}: neispravan JSON`);
+      continue;
     }
   }
 
+  if (sawOverload) {
+    throw new GeminiError("Gemini modeli su trenutno preopterećeni — probaj ponovo za koji minut.", "overloaded");
+  }
+  if (sawRateLimit) {
+    throw new GeminiError("Dostignut je limit besplatnog Gemini plana — probaj za minut.", "rate_limited");
+  }
   throw new GeminiError(
     `Nijedan Gemini model nije dostupan (${models.join(", ")}): ${String(
       (lastError as Error)?.message ?? lastError

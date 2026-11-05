@@ -9,7 +9,9 @@ import { monthOf } from "./dates";
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`isteklo vreme (${Math.round(ms / 1000)} s)`)), ms)
+    ),
   ]);
 }
 
@@ -18,6 +20,8 @@ export interface ProviderStatus {
   label: string;
   count: number;
   note?: string;
+  /** Poruka greške ako izvor nije uspeo (prikazuje se u UI-ju) */
+  error?: string;
 }
 
 interface CachedPayload {
@@ -172,16 +176,21 @@ export async function performSearchStreaming(
           });
         })
         .catch((reason) => {
+          // Vidljivo u Vercel → Logs; poruka ide i u UI (lista izvora).
+          console.error(`[search] ${provider.id} failed:`, reason);
           perProviderResults[index] = [];
-          errors.push({
-            provider: provider.id,
-            message: String((reason as Error)?.message ?? reason),
-          });
+          // Playwright dodaje višeredni "Call log" sa ANSI kodovima — samo prvi red.
+          const message = String((reason as Error)?.message ?? reason)
+            .split("\n")[0]
+            .replace(/\u001b\[[0-9;]*m/g, "")
+            .slice(0, 240);
+          errors.push({ provider: provider.id, message });
           const status: ProviderStatus = {
             id: provider.id,
             label: provider.label,
             count: 0,
             note: provider.note,
+            error: message,
           };
           providerStatus[index] = status;
           completedProviders++;
@@ -197,7 +206,13 @@ export async function performSearchStreaming(
   );
 
   const merged = mergeOffers(perProviderResults);
-  await setCached<CachedPayload>(cacheKey, { offers: merged, providerStatus, destination });
+  // Ako je neki izvor pao (npr. Booking timeout), ne zaključavamo taj
+  // nepotpun rezultat na 3 sata — ponovni pokušaj već posle 10 minuta.
+  await setCached<CachedPayload>(
+    cacheKey,
+    { offers: merged, providerStatus, destination },
+    errors.length > 0 ? 60 * 10 : undefined
+  );
 
   const result = finalizeSearchResult(
     params,

@@ -42,7 +42,7 @@ export default function ProviderFilter({
               key={p.id}
               type="button"
               onClick={() => toggle(p.id)}
-              title={p.note ?? p.label}
+              title={p.error ?? p.note ?? p.label}
               aria-pressed={isActive}
               className={`lm-check ${p.count === 0 ? "text-ink-subtle" : ""}`}
             >
