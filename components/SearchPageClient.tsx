@@ -109,13 +109,10 @@ export default function SearchPageClient({
     let source: EventSource | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    // attempt 0: puna pretraga. Ako veza pukne:
-    // - brzo (< 15 s, verovatno kratak prekid mreže) → ista pretraga ponovo;
-    // - posle dužeg rada (server je verovatno pao zbog Chromium izvora) →
-    //   pretraga bez Booking/Airbnb/Filip Travel (nobrowser=1).
+    // Pokušaji 0–2: puna pretraga; pokušaj 3: bez Booking/Airbnb/Filip
+    // Travel (nobrowser=1); ako i on pukne → poruka o grešci.
     const connect = (attempt: number, lite: boolean) => {
       completedRef.current = false;
-      const startedAt = Date.now();
       source = new EventSource(`/api/search/stream?${queryString}${lite ? "&nobrowser=1" : ""}`);
 
       source.onmessage = (event) => {
@@ -162,15 +159,16 @@ export default function SearchPageClient({
       source.onerror = () => {
         source?.close();
         if (cancelled || completedRef.current) return;
-        if (attempt >= 2 || (lite && attempt >= 1)) {
+        if (lite) {
           setReconnecting(false);
           setFetchError(tRef.current("search.fetchError"));
           return;
         }
-        const quickDrop = Date.now() - startedAt < 15000;
         setReconnecting(true);
-        // Drugi neuspeh zaredom → uvek rezervni režim bez browser izvora.
-        retryTimer = setTimeout(() => connect(attempt + 1, lite || !quickDrop || attempt >= 1), 1500);
+        // Prekid je najčešće na strani korisnika (net::ERR_NETWORK_CHANGED —
+        // VPN, Wi-Fi, promena mreže), pa punu pretragu ponavljamo do 2 puta;
+        // tek posle toga rezervni režim bez Booking/Airbnb/Filip Travel.
+        retryTimer = setTimeout(() => connect(attempt + 1, attempt >= 2), 1500);
       };
     };
 

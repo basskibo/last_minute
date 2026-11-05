@@ -53,10 +53,13 @@ export default function AiInsights({
       if (batch.length === 0) return;
       setStatus("loading");
       try {
-        const res = await fetch("/api/ai/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...context, locale, preferences, offers: batch }),
+        // Mrežni prekid (npr. net::ERR_NETWORK_CHANGED) → još jedan pokušaj.
+        const body = JSON.stringify({ ...context, locale, preferences, offers: batch });
+        const post = () =>
+          fetch("/api/ai/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+        const res = await post().catch(async () => {
+          await new Promise((r) => setTimeout(r, 1500));
+          return post();
         });
         const data = (await res.json()) as {
           analysis?: AiAnalysis;
