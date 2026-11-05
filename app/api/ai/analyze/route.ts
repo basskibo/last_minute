@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeOffers, AI_MAX_OFFERS, type AiRequest } from "@/lib/ai/analyze";
 import { GeminiError, isGeminiConfigured } from "@/lib/ai/gemini";
+import { heuristicAnalysis } from "@/lib/ai/heuristic";
 import { getCached, setCached } from "@/lib/cache";
 import type { Offer } from "@/lib/providers/types";
 
@@ -96,10 +97,20 @@ export async function POST(req: NextRequest) {
     await setCached(cacheKey, analysis, 60 * 60 * 3);
     return NextResponse.json({ analysis, cached: false });
   } catch (err) {
+    if (err instanceof GeminiError && err.code !== "not_configured") {
+      // Gemini nedostupan (preopterećen, limit, timeout…) — vraćamo
+      // automatski izbor da korisnik ipak dobije preporuke. Ne keširamo ga,
+      // da sledeći pokušaj opet ide na Gemini.
+      console.error("[ai] Gemini unavailable, using heuristic:", err.message);
+      return NextResponse.json({
+        analysis: heuristicAnalysis(parsed),
+        fallback: true,
+        error: err.code,
+        message: err.message,
+      });
+    }
     if (err instanceof GeminiError) {
-      const status =
-        err.code === "rate_limited" ? 429 : err.code === "overloaded" ? 503 : err.code === "not_configured" ? 501 : 502;
-      return NextResponse.json({ error: err.code, message: err.message }, { status });
+      return NextResponse.json({ error: err.code, message: err.message }, { status: 501 });
     }
     return NextResponse.json({ error: "failed", message: String((err as Error)?.message ?? err) }, { status: 500 });
   }

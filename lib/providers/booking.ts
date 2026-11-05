@@ -21,6 +21,9 @@ import { pickStayDates, formatDateRange } from "../dates";
 
 const PAGES = [0, 25];
 
+/** Kartica hotela; drugi selektor je rezerva ako Booking preimenuje omotač. */
+const CARD_SELECTOR = '[data-testid="property-card"], [data-testid="property-card-container"]';
+
 function parseMoney(text: string | null | undefined): number | null {
   if (!text) return null;
   const match = text.replace(/\s/g, "").match(/(\d[\d.,]*)/);
@@ -46,12 +49,12 @@ interface RawCard {
 
 async function scrapePage(page: Page, url: string): Promise<RawCard[]> {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
-  await page.waitForSelector('[data-testid="property-card"]', { timeout: 15000 }).catch(() => null);
+  await page.waitForSelector(CARD_SELECTOR, { timeout: 15000 }).catch(() => null);
   // Kartice se dorenderuju posle prve — kratko sačekaj i skroluj do dna.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => null);
   await page.waitForTimeout(1200);
 
-  return page.$$eval('[data-testid="property-card"]', (nodes) =>
+  return page.$$eval(CARD_SELECTOR, (nodes) =>
     nodes.map((card) => {
       const q = (sel: string) => card.querySelector(sel);
       return {
@@ -72,20 +75,27 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
   const { context, release } = await acquireBrowserContext();
 
   try {
-    const urls = PAGES.map((offset) => {
-      const url = new URL("https://www.booking.com/searchresults.html");
-      url.searchParams.set("ss", params.bookingQuery || params.destination);
-      url.searchParams.set("checkin", checkin);
-      url.searchParams.set("checkout", checkout);
-      url.searchParams.set("group_adults", String(params.adults));
-      url.searchParams.set("group_children", String(params.children));
-      for (let i = 0; i < params.children; i++) url.searchParams.append("age", "8");
-      url.searchParams.set("no_rooms", "1");
-      url.searchParams.set("selected_currency", "EUR");
-      url.searchParams.set("lang", "en-us");
-      if (offset) url.searchParams.set("offset", String(offset));
-      return url.toString();
-    });
+    // Samo naziv mesta ("Paris", "Spain"), bez ", Država": Booking je
+    // "Paris%2C+France" čitao bukvalno (naslov strane: "Search results:
+    // Paris%2C+France") i vraćao praznu stranu bez hotela. Razmaci kao %20.
+    const ss = (params.bookingQuery || params.destination).split(",")[0].trim();
+    const q = (k: string, v: string | number) => `${k}=${encodeURIComponent(String(v))}`;
+    const urls = PAGES.map((offset) =>
+      [
+        q("ss", ss),
+        q("ssne", ss),
+        q("ssne_untouched", ss),
+        q("checkin", checkin),
+        q("checkout", checkout),
+        q("group_adults", params.adults),
+        q("group_children", params.children),
+        ...Array.from({ length: params.children }, () => q("age", 8)),
+        q("no_rooms", 1),
+        q("selected_currency", "EUR"),
+        q("lang", "en-us"),
+        ...(offset ? [q("offset", offset)] : []),
+      ].join("&")
+    ).map((query) => `https://www.booking.com/searchresults.html?${query}`);
 
     const pages = await Promise.all(urls.map(() => context.newPage()));
     const settled = await Promise.allSettled(urls.map((u, i) => scrapePage(pages[i], u)));

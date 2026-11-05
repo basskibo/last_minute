@@ -183,7 +183,7 @@ export async function performSearchStreaming(
           const message = String((reason as Error)?.message ?? reason)
             .split("\n")[0]
             .replace(/\u001b\[[0-9;]*m/g, "")
-            .slice(0, 240);
+            .slice(0, 500);
           errors.push({ provider: provider.id, message });
           const status: ProviderStatus = {
             id: provider.id,

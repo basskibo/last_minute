@@ -2,7 +2,8 @@ import type { Offer } from "../providers/types";
 import { boardTypes, discountPercent } from "../filters";
 import { generateJson } from "./gemini";
 
-export const AI_MAX_OFFERS = 60;
+/** Manji prompt = brži odgovor i manja šansa za timeout na besplatnom planu. */
+export const AI_MAX_OFFERS = 40;
 
 export interface AiRequest {
   locale: "sr" | "en";

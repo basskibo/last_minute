@@ -6,7 +6,7 @@ import { useAppPreferences } from "@/components/providers/AppProviders";
 import type { Offer } from "@/lib/providers/types";
 import type { AiAnalysis } from "@/lib/ai/analyze";
 
-const AI_MAX_OFFERS = 60;
+const AI_MAX_OFFERS = 40;
 
 let enabledPromise: Promise<boolean> | null = null;
 function checkEnabled(): Promise<boolean> {
@@ -40,6 +40,8 @@ export default function AiInsights({
   const [status, setStatus] = useState<Status>("checking");
   const [errorKind, setErrorKind] = useState<"rate" | "busy" | "config" | "other">("other");
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  /** true = Gemini nije odgovorio, prikazan je automatski (pravilima) izbor */
+  const [fallback, setFallback] = useState(false);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analyzed, setAnalyzed] = useState<Offer[]>([]);
   const [prefs, setPrefs] = useState("");
@@ -56,7 +58,14 @@ export default function AiInsights({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...context, locale, preferences, offers: batch }),
         });
-        const data = (await res.json()) as { analysis?: AiAnalysis; error?: string; message?: string };
+        const data = (await res.json()) as {
+          analysis?: AiAnalysis;
+          fallback?: boolean;
+          error?: string;
+          message?: string;
+        };
+        setFallback(Boolean(data.fallback));
+        setErrorDetail(data.fallback ? (data.message?.match(/\[(.*)\]/)?.[1] ?? data.message ?? null) : null);
         if (!res.ok || !data.analysis) {
           setErrorDetail(data.message?.match(/\[(.*)\]/)?.[1] ?? data.message ?? null);
           setErrorKind(
@@ -211,6 +220,20 @@ export default function AiInsights({
 
       {analysis && status !== "loading" && (
         <div className="flex flex-col gap-5">
+          {fallback && (
+            <div className="lm-callout lm-callout--info">
+              <Lightbulb size={16} className="mt-0.5 shrink-0" aria-hidden />
+              <div className="min-w-0">
+                <p>{t("ai.fallbackNote")}</p>
+                {errorDetail && (
+                  <details className="mt-1 text-xs">
+                    <summary className="cursor-pointer font-semibold">{t("search.errorDetails")}</summary>
+                    <p className="mt-1 break-words">{errorDetail}</p>
+                  </details>
+                )}
+              </div>
+            </div>
+          )}
           {analysis.summary && <p className="text-[15px] leading-6 text-ink">{analysis.summary}</p>}
 
           {analysis.picks.length > 0 && (

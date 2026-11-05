@@ -110,9 +110,27 @@ export async function describeEmptyPage(page: import("playwright-core").Page): P
       /awswaf|captcha|challenge-platform|verify (that )?you are (a )?human|are you a robot|just a moment|access denied|unusual traffic/i.test(
         html
       );
-    return blocked
-      ? `sajt je vratio anti-bot proveru umesto rezultata (naslov: "${title}") — server IP je verovatno blokiran`
-      : `nijedna kartica na strani "${title}" (${url.host}${url.pathname}) — moguće da se HTML promenio`;
+    if (blocked) {
+      return `sajt je vratio anti-bot proveru umesto rezultata (naslov: "${title}") — server IP je verovatno blokiran`;
+    }
+    // Šta JESTE na strani — da sledeća ispravka selektora ne bude nagađanje.
+    const info = await page
+      .evaluate(() => {
+        const h1 = document.querySelector("h1")?.textContent?.trim().slice(0, 100) ?? "";
+        const ids = new Map<string, number>();
+        document.querySelectorAll("[data-testid]").forEach((el) => {
+          const id = el.getAttribute("data-testid") ?? "";
+          ids.set(id, (ids.get(id) ?? 0) + 1);
+        });
+        const top = [...ids.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 12)
+          .map(([id, n]) => `${id}×${n}`)
+          .join(", ");
+        return { h1, top };
+      })
+      .catch(() => ({ h1: "", top: "" }));
+    return `nijedna kartica na strani "${title}" (${url.host}${url.pathname}); h1: "${info.h1}"; data-testid: ${info.top || "nema"}`;
   } catch (err) {
     return `strana nije učitana (${String((err as Error)?.message ?? err).slice(0, 120)})`;
   }
