@@ -105,18 +105,18 @@ export async function describeEmptyPage(page: import("playwright-core").Page): P
   try {
     const title = (await page.title()).slice(0, 80);
     const url = new URL(page.url());
-    const html = (await page.content()).slice(0, 300_000);
-    const blocked =
-      /awswaf|captcha|challenge-platform|verify (that )?you are (a )?human|are you a robot|just a moment|access denied|unusual traffic/i.test(
-        html
-      );
-    if (blocked) {
-      return `sajt je vratio anti-bot proveru umesto rezultata (naslov: "${title}") — server IP je verovatno blokiran`;
-    }
-    // Šta JESTE na strani — da sledeća ispravka selektora ne bude nagađanje.
+    const cookies = await page.context().cookies().catch(() => []);
+    const wafToken = cookies.some((c) => c.name === "aws-waf-token");
+    // Činjenice sa strane — bez nagađanja (skripte za WAF postoje i na
+    // normalnim stranama, pa same po sebi ne znače blokadu).
     const info = await page
       .evaluate(() => {
         const h1 = document.querySelector("h1")?.textContent?.trim().slice(0, 100) ?? "";
+        const captcha = Boolean(
+          document.querySelector(
+            '#captcha-container, awswaf-captcha, iframe[src*="captcha"], iframe[src*="challenge"], .g-recaptcha, #challenge-form'
+          )
+        );
         const ids = new Map<string, number>();
         document.querySelectorAll("[data-testid]").forEach((el) => {
           const id = el.getAttribute("data-testid") ?? "";
@@ -127,10 +127,14 @@ export async function describeEmptyPage(page: import("playwright-core").Page): P
           .slice(0, 12)
           .map(([id, n]) => `${id}×${n}`)
           .join(", ");
-        return { h1, top };
+        return { h1, captcha, top, textLen: document.body?.innerText?.length ?? 0 };
       })
-      .catch(() => ({ h1: "", top: "" }));
-    return `nijedna kartica na strani "${title}" (${url.host}${url.pathname}); h1: "${info.h1}"; data-testid: ${info.top || "nema"}`;
+      .catch(() => ({ h1: "", captcha: false, top: "", textLen: 0 }));
+
+    const facts = `naslov: "${title}"; h1: "${info.h1}"; ${url.host}${url.pathname}; tekst: ${info.textLen} znakova; aws-waf-token: ${wafToken ? "da" : "ne"}; data-testid: ${info.top || "nema"}`;
+    return info.captcha
+      ? `sajt je prikazao captcha proveru — server IP je verovatno blokiran (${facts})`
+      : `nijedna kartica nije učitana (${facts})`;
   } catch (err) {
     return `strana nije učitana (${String((err as Error)?.message ?? err).slice(0, 120)})`;
   }

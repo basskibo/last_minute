@@ -62,13 +62,15 @@ export async function searchFilipTravel(params: SearchParams): Promise<Offer[]> 
   try {
     const page = await context.newPage();
 
-    const paths = [`/`, `/destinacije/${destKey}`, `/last-minute`, `/ponude`];
+    // Sajt je iza Cloudflare provere — kratko čekanje i manje putanja, da ne
+    // drži zajednički browser zauzetim (ranije je redovno isticao posle 45 s).
+    const paths = [`/destinacije/${destKey}`, `/last-minute`];
     const offers: Offer[] = [];
 
     for (const path of paths) {
       try {
-        await page.goto(`${BASE_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 45000 });
-        for (let i = 0; i < 15; i++) {
+        await page.goto(`${BASE_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 12000 });
+        for (let i = 0; i < 4; i++) {
           const title = await page.title();
           const html = await page.content();
           if (!isBlocked(title, html)) break;
@@ -100,6 +102,6 @@ export const filipTravelProvider: Provider = {
   id: "filiptravel",
   label: "Filip Travel",
   note: "Sajt često blokira automatske zahteve (Cloudflare) — rezultati mogu biti prazni.",
-  timeoutMs: 45000,
+  timeoutMs: 30000,
   search: searchFilipTravel,
 };

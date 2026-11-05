@@ -20,6 +20,8 @@ import { pickStayDates, formatDateRange } from "../dates";
  */
 
 const PAGES = [0, 25];
+/** Ukupno vreme za Booking unutar timeoutMs provajdera (ostaje rezerva za zatvaranje). */
+const BOOKING_BUDGET_MS = 44000;
 
 /** Kartica hotela; drugi selektor je rezerva ako Booking preimenuje omotač. */
 const CARD_SELECTOR = '[data-testid="property-card"], [data-testid="property-card-container"]';
@@ -47,12 +49,30 @@ interface RawCard {
   reviewText: string;
 }
 
-async function scrapePage(page: Page, url: string): Promise<RawCard[]> {
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
-  await page.waitForSelector(CARD_SELECTOR, { timeout: 15000 }).catch(() => null);
+async function waitForCards(page: Page, timeout: number): Promise<boolean> {
+  return page
+    .waitForSelector(CARD_SELECTOR, { timeout })
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function scrapePage(page: Page, url: string, deadline: number): Promise<RawCard[]> {
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+  let found = await waitForCards(page, 12000);
+
+  // Booking prvo vrati "ljušturu" strane, a hotele učita tek kad AWS WAF
+  // JavaScript postavi token (kolačić aws-waf-token). Bez tokena kartice
+  // nikad ne stignu — ponovno učitavanje sa postavljenim tokenom ih vrati.
+  if (!found && deadline - Date.now() > 9000) {
+    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => null);
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
+    found = await waitForCards(page, Math.max(3000, Math.min(12000, deadline - Date.now() - 2000)));
+  }
+  if (!found) return [];
+
   // Kartice se dorenderuju posle prve — kratko sačekaj i skroluj do dna.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => null);
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1000);
 
   return page.$$eval(CARD_SELECTOR, (nodes) =>
     nodes.map((card) => {
@@ -97,14 +117,17 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
       ].join("&")
     ).map((query) => `https://www.booking.com/searchresults.html?${query}`);
 
-    const pages = await Promise.all(urls.map(() => context.newPage()));
-    const settled = await Promise.allSettled(urls.map((u, i) => scrapePage(pages[i], u)));
-    const raw = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+    // Strane redom (ne paralelno): druga strana tek ako je prva uspela i
+    // ostalo je vremena — manje opterećenje i isti WAF token za obe.
+    const deadline = Date.now() + BOOKING_BUDGET_MS;
+    const page = await context.newPage();
+    const raw: RawCard[] = await scrapePage(page, urls[0], deadline);
     if (raw.length === 0) {
-      if (settled.every((r) => r.status === "rejected")) {
-        throw (settled[0] as PromiseRejectedResult).reason;
-      }
-      throw new Error(`Booking: ${await describeEmptyPage(pages[0])}`);
+      throw new Error(`Booking: ${await describeEmptyPage(page)}`);
+    }
+    for (const url of urls.slice(1)) {
+      if (deadline - Date.now() < 10000) break;
+      raw.push(...(await scrapePage(page, url, deadline).catch(() => [])));
     }
 
     const people = params.adults + params.children;
@@ -120,8 +143,9 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
 
         // Booking u kartici ima i tekst za čitače ekrana:
         // "Original price € 1,234. Current price € 999."
-        const original = r.allText.match(/Original price\s*€?\s*([\d.,]+)/i);
-        const current = r.allText.match(/Current price\s*€?\s*([\d.,]+)/i);
+        // Bilo koja oznaka valute (€, EUR…) između teksta i iznosa.
+        const original = r.allText.match(/Original price\D{0,8}?([\d.,]+)/i);
+        const current = r.allText.match(/Current price\D{0,8}?([\d.,]+)/i);
         const total = parseMoney(current?.[1]) ?? parseMoney(r.priceText);
         const oldTotal = parseMoney(original?.[1]);
 
@@ -163,6 +187,6 @@ export const bookingProvider: Provider = {
   id: "booking",
   label: "Booking.com",
   scope: "place",
-  timeoutMs: 40000,
+  timeoutMs: 50000,
   search: searchBooking,
 };
