@@ -19,7 +19,9 @@ import { pickStayDates, formatDateRange } from "../dates";
  * cenuje po smeštajnoj jedinici, ne po osobi.
  */
 
-const PAGES = [0, 25];
+/** Samo prva strana (25 hotela): druga strana je na serverless funkciji
+ * udvostručavala vreme i memoriju, a retko donosi bolje ponude. */
+const PAGES = [0];
 /** Ukupno vreme za Booking unutar timeoutMs provajdera (ostaje rezerva za zatvaranje). */
 const BOOKING_BUDGET_MS = 44000;
 
@@ -277,6 +279,7 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
 
 export const bookingProvider: Provider = {
   id: "booking",
+  usesBrowser: true,
   label: "Booking.com",
   scope: "place",
   timeoutMs: 50000,

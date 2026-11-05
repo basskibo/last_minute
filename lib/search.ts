@@ -1,4 +1,4 @@
-import { providers } from "./providers";
+import { providers as allProviders } from "./providers";
 import type { Offer, SearchParams } from "./providers/types";
 import { buildCacheKey, getCached, setCached } from "./cache";
 import { mergeOffers, prioritizeMonth, sortOffers, type SortOption } from "./normalize";
@@ -100,12 +100,16 @@ export async function performSearchStreaming(
   params: SearchParams,
   sort: SortOption = "price-asc",
   providerFilter: string[] | undefined,
-  emit: (event: SearchProgressEvent) => void
+  emit: (event: SearchProgressEvent) => void,
+  options: { skipBrowser?: boolean } = {}
 ): Promise<SearchResult> {
+  // skipBrowser: rezervni režim kad je prethodni pokušaj pukao (npr. server
+  // ostao bez memorije zbog Chromium-a) — samo "obični" izvori.
+  const providers = options.skipBrowser ? allProviders.filter((p) => !p.usesBrowser) : allProviders;
   const totalProviders = providers.length;
   emit({ type: "start", totalProviders });
 
-  const cacheKey = buildCacheKey(params);
+  const cacheKey = buildCacheKey(params) + (options.skipBrowser ? ":nobrowser" : "");
   const cached = await getCached<CachedPayload>(cacheKey);
   const resolved = await resolveDestination(params.destination);
   const destination: ResolvedDestinationInfo = {

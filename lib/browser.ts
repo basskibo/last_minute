@@ -18,7 +18,16 @@ export async function launchBrowser(): Promise<Browser> {
       // zatvaranje jednog taba/contexta ruši ceo Chromium, pa su ostali
       // izvori padali sa "Target page, context or browser has been closed"
       // (reprodukovano lokalno sa istim @sparticuz/chromium binarnim fajlom).
-      args: sparticuzChromium.args.filter((arg) => arg !== "--single-process"),
+      args: [
+        ...sparticuzChromium.args.filter((arg) => arg !== "--single-process"),
+        // U multi-process režimu Chromium deli memoriju preko /dev/shm, koji
+        // je na serverless funkciji vrlo mali → rušenje/ubijanje funkcije.
+        "--disable-dev-shm-usage",
+        // Manje paralelnih renderer procesa = manja potrošnja memorije.
+        "--renderer-process-limit=3",
+        "--disable-extensions",
+        "--mute-audio",
+      ],
       executablePath: await sparticuzChromium.executablePath(),
       headless: true,
     });
@@ -34,6 +43,9 @@ export async function launchBrowser(): Promise<Browser> {
  * zatvara kad ga poslednji korisnik pusti.
  */
 let shared: { browser: Promise<Browser>; users: number } | null = null;
+
+const TRACKER_HOSTS =
+  /(^|\.)(googletagmanager|google-analytics|doubleclick|googlesyndication|googleadservices|facebook|connect\.facebook|hotjar|clarity|criteo|taboola|outbrain|adnxs|amazon-adsystem|bing|tiktok|snapchat|pinterest|quantserve|scorecardresearch|newrelic|nr-data|datadoghq|sentry|optimizely|segment|mixpanel|branch)\./i;
 
 export async function acquireBrowserContext(): Promise<{
   context: BrowserContext;
@@ -75,8 +87,11 @@ export async function acquireBrowserContext(): Promise<{
   // Slike, fontovi i video nisu potrebni za čitanje rezultata (src atribut
   // slike ostaje u DOM-u) — preskakanje drastično ubrzava učitavanje.
   await context.route("**/*", (route) => {
-    const type = route.request().resourceType();
+    const request = route.request();
+    const type = request.resourceType();
     if (type === "image" || type === "font" || type === "media") return route.abort();
+    // Trekeri/reklame troše memoriju i CPU, a rezultatima ne trebaju.
+    if (TRACKER_HOSTS.test(new URL(request.url()).hostname)) return route.abort();
     return route.continue();
   });
 

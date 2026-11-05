@@ -69,19 +69,38 @@ export async function GET(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: SearchProgressEvent | { error: string }) => {
-        controller.enqueue(encoder.encode(sseLine(event)));
+        try {
+          controller.enqueue(encoder.encode(sseLine(event)));
+        } catch {
+          // klijent je već zatvorio vezu
+        }
       };
+
+      // Heartbeat: SSE komentar na svakih 8 s, da proksiji (CDN, Vercel)
+      // ne prekinu vezu dok sporiji izvori (Booking) još rade.
+      let closed = false;
+      const heartbeat = setInterval(() => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(": ping\n\n"));
+        } catch {
+          closed = true;
+        }
+      }, 8000);
 
       try {
         await performSearchStreaming(
           parsed.params,
           parsed.sort,
           parsed.providerFilter,
-          (event) => send(event)
+          (event) => send(event),
+          { skipBrowser: req.nextUrl.searchParams.get("nobrowser") === "1" }
         );
       } catch (err) {
         send({ error: String((err as Error)?.message ?? err) });
       } finally {
+        closed = true;
+        clearInterval(heartbeat);
         controller.close();
       }
     },

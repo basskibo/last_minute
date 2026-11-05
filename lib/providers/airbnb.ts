@@ -106,6 +106,7 @@ export async function searchAirbnb(params: SearchParams): Promise<Offer[]> {
 
 export const airbnbProvider: Provider = {
   id: "airbnb",
+  usesBrowser: true,
   label: "Airbnb",
   scope: "place",
   timeoutMs: 40000,

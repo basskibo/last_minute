@@ -77,6 +77,10 @@ export default function SearchPageClient({
   const [result, setResult] = useState<SearchResult | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
+  /** Veza je pukla, ponovni pokušaj u toku */
+  const [reconnecting, setReconnecting] = useState(false);
+  /** Rezultat je iz rezervnog režima bez Booking/Airbnb/Filip Travel */
+  const [degraded, setDegraded] = useState(false);
   const completedRef = useRef(false);
   const tRef = useRef(t);
   useEffect(() => {
@@ -101,54 +105,81 @@ export default function SearchPageClient({
   }, [destination, adults, children, month, from, to, exact]);
 
   useEffect(() => {
-    completedRef.current = false;
-    const source = new EventSource(`/api/search/stream?${queryString}`);
+    let cancelled = false;
+    let source: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    source.onmessage = (event) => {
-      const data = JSON.parse(event.data) as {
-        type?: string;
-        error?: string;
-        totalProviders?: number;
-        completedProviders?: number;
-        offersSoFar?: number;
-        provider?: SearchProgressState["providers"][number];
-        result?: SearchResult;
+    // attempt 0: puna pretraga. Ako veza pukne:
+    // - brzo (< 15 s, verovatno kratak prekid mreže) → ista pretraga ponovo;
+    // - posle dužeg rada (server je verovatno pao zbog Chromium izvora) →
+    //   pretraga bez Booking/Airbnb/Filip Travel (nobrowser=1).
+    const connect = (attempt: number, lite: boolean) => {
+      completedRef.current = false;
+      const startedAt = Date.now();
+      source = new EventSource(`/api/search/stream?${queryString}${lite ? "&nobrowser=1" : ""}`);
+
+      source.onmessage = (event) => {
+        const data = JSON.parse(event.data) as {
+          type?: string;
+          error?: string;
+          totalProviders?: number;
+          completedProviders?: number;
+          offersSoFar?: number;
+          provider?: SearchProgressState["providers"][number];
+          result?: SearchResult;
+        };
+
+        if (data.error) {
+          setFetchError(data.error);
+          source?.close();
+          return;
+        }
+        if (data.type === "start" && data.totalProviders != null) {
+          setProgress({ ...initialSearchProgress, started: true, totalProviders: data.totalProviders });
+          setResult(null);
+          setFetchError(null);
+          setAnalysis(null);
+          setReconnecting(false);
+        }
+        if (data.type === "provider") {
+          setProgress((prev) => ({
+            ...prev,
+            started: true,
+            totalProviders: data.totalProviders ?? prev.totalProviders,
+            completedProviders: data.completedProviders ?? prev.completedProviders,
+            offersSoFar: data.offersSoFar ?? prev.offersSoFar,
+            providers: data.provider ? [...prev.providers, data.provider] : prev.providers,
+          }));
+        }
+        if (data.type === "complete" && data.result) {
+          completedRef.current = true;
+          setDegraded(lite);
+          setResult(data.result);
+          source?.close();
+        }
       };
 
-      if (data.error) {
-        setFetchError(data.error);
-        source.close();
-        return;
-      }
-      if (data.type === "start" && data.totalProviders != null) {
-        setProgress({ ...initialSearchProgress, started: true, totalProviders: data.totalProviders });
-        setResult(null);
-        setFetchError(null);
-        setAnalysis(null);
-      }
-      if (data.type === "provider") {
-        setProgress((prev) => ({
-          ...prev,
-          started: true,
-          totalProviders: data.totalProviders ?? prev.totalProviders,
-          completedProviders: data.completedProviders ?? prev.completedProviders,
-          offersSoFar: data.offersSoFar ?? prev.offersSoFar,
-          providers: data.provider ? [...prev.providers, data.provider] : prev.providers,
-        }));
-      }
-      if (data.type === "complete" && data.result) {
-        completedRef.current = true;
-        setResult(data.result);
-        source.close();
-      }
+      source.onerror = () => {
+        source?.close();
+        if (cancelled || completedRef.current) return;
+        if (attempt >= 2 || (lite && attempt >= 1)) {
+          setReconnecting(false);
+          setFetchError(tRef.current("search.fetchError"));
+          return;
+        }
+        const quickDrop = Date.now() - startedAt < 15000;
+        setReconnecting(true);
+        // Drugi neuspeh zaredom → uvek rezervni režim bez browser izvora.
+        retryTimer = setTimeout(() => connect(attempt + 1, lite || !quickDrop || attempt >= 1), 1500);
+      };
     };
 
-    source.onerror = () => {
-      if (!completedRef.current) setFetchError(tRef.current("search.fetchError"));
-      source.close();
+    connect(0, false);
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+      source?.close();
     };
-
-    return () => source.close();
   }, [queryString]);
 
   // ── Filteri i sortiranje (stanje u URL-u, bez navigacije) ──
@@ -247,6 +278,12 @@ export default function SearchPageClient({
           <div className={LAYOUT}>
             <SearchPanelSkeleton />
             <section className="flex min-w-0 flex-col gap-4">
+              {reconnecting && (
+                <p className="lm-callout lm-callout--info" role="status">
+                  <Info size={16} className="mt-0.5 shrink-0" aria-hidden />
+                  {t("search.reconnecting")}
+                </p>
+              )}
               <SearchProgress progress={progress} />
               <ResultsGridSkeleton />
             </section>
@@ -271,6 +308,13 @@ export default function SearchPageClient({
                 onSortChange={setSort}
                 aiAvailable={aiPicks.size > 0}
               />
+
+              {degraded && (
+                <p className="lm-callout lm-callout--warning">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+                  {t("search.degraded")}
+                </p>
+              )}
 
               {result.errors.length > 0 && (
                 <div className="lm-callout lm-callout--warning">

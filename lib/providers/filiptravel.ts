@@ -100,6 +100,7 @@ export async function searchFilipTravel(params: SearchParams): Promise<Offer[]> 
 
 export const filipTravelProvider: Provider = {
   id: "filiptravel",
+  usesBrowser: true,
   label: "Filip Travel",
   note: "Sajt često blokira automatske zahteve (Cloudflare) — rezultati mogu biti prazni.",
   timeoutMs: 30000,

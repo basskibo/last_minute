@@ -74,5 +74,7 @@ export interface Provider {
    * koje mesto (Booking, Airbnb).
    */
   scope?: "country" | "place";
+  /** Izvor pokreće headless Chromium (Booking, Airbnb, Filip Travel) */
+  usesBrowser?: boolean;
   search(params: SearchParams): Promise<Offer[]>;
 }
