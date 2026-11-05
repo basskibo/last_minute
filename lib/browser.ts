@@ -13,7 +13,12 @@ export async function launchBrowser(): Promise<Browser> {
   if (isServerless) {
     const sparticuzChromium = (await import("@sparticuz/chromium")).default;
     return chromium.launch({
-      args: sparticuzChromium.args,
+      // Bez --single-process: Booking, Airbnb i Filip Travel rade u istom
+      // browseru (vidi acquireBrowserContext). U single-process režimu
+      // zatvaranje jednog taba/contexta ruši ceo Chromium, pa su ostali
+      // izvori padali sa "Target page, context or browser has been closed"
+      // (reprodukovano lokalno sa istim @sparticuz/chromium binarnim fajlom).
+      args: sparticuzChromium.args.filter((arg) => arg !== "--single-process"),
       executablePath: await sparticuzChromium.executablePath(),
       headless: true,
     });
@@ -36,10 +41,18 @@ export async function acquireBrowserContext(): Promise<{
 }> {
   if (!shared) {
     const browser = launchBrowser();
-    shared = { browser, users: 0 };
-    browser.catch(() => {
-      shared = null;
-    });
+    const entry = { browser, users: 0 };
+    shared = entry;
+    browser.then(
+      (b) =>
+        b.on("disconnected", () => {
+          // Srušen ili zatvoren browser — sledeća pretraga pokreće novi.
+          if (shared === entry) shared = null;
+        }),
+      () => {
+        if (shared === entry) shared = null;
+      }
+    );
   }
   const entry = shared;
   entry.users++;
