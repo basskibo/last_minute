@@ -49,22 +49,39 @@ interface RawCard {
   reviewText: string;
 }
 
+/**
+ * Čeka kartice hotela ILI Booking-ovu poruku "0 properties …" (tada nema
+ * svrhe čekati do isteka — odmah prelazimo na pretragu sa dest_id).
+ */
 async function waitForCards(page: Page, timeout: number): Promise<boolean> {
-  return page
-    .waitForSelector(CARD_SELECTOR, { timeout })
-    .then(() => true)
-    .catch(() => false);
+  const outcome = await page
+    .waitForFunction(
+      (selector) => {
+        if (document.querySelector(selector)) return "cards";
+        const h1 = document.querySelector("h1")?.textContent ?? "";
+        return /^\s*0 propert/i.test(h1) ? "empty" : null;
+      },
+      CARD_SELECTOR,
+      { timeout }
+    )
+    .then((handle) => handle.jsonValue())
+    .catch(() => "timeout");
+  return outcome === "cards";
 }
 
-async function scrapePage(page: Page, url: string, deadline: number): Promise<RawCard[]> {
+async function scrapePage(
+  page: Page,
+  url: string,
+  deadline: number,
+  allowReload = true
+): Promise<RawCard[]> {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
-  let found = await waitForCards(page, 12000);
+  let found = await waitForCards(page, Math.min(12000, Math.max(3000, deadline - Date.now() - 2000)));
 
-  // Booking prvo vrati "ljušturu" strane, a hotele učita tek kad AWS WAF
-  // JavaScript postavi token (kolačić aws-waf-token). Bez tokena kartice
-  // nikad ne stignu — ponovno učitavanje sa postavljenim tokenom ih vrati.
-  if (!found && deadline - Date.now() > 9000) {
-    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => null);
+  // Booking ponekad prvo vrati "ljušturu" strane, a hotele učita tek kad
+  // AWS WAF JavaScript postavi token — ponovno učitavanje ih tada vrati.
+  if (!found && allowReload && deadline - Date.now() > 9000) {
+    await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
     await page.reload({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
     found = await waitForCards(page, Math.max(3000, Math.min(12000, deadline - Date.now() - 2000)));
   }
@@ -90,6 +107,57 @@ async function scrapePage(page: Page, url: string, deadline: number): Promise<Ra
   );
 }
 
+interface BookingDest {
+  dest_id: string;
+  dest_type: string;
+  label?: string;
+}
+
+/** dest_id po upitu — Booking ID-jevi se ne menjaju, čuvamo ih dok instanca živi. */
+const destCache = new Map<string, BookingDest>();
+
+/**
+ * Booking-ova pretraga traži interni ID destinacije (dest_id + dest_type),
+ * koji njihov sajt dobija iz servisa za predloge dok korisnik kuca. Sam
+ * tekst `ss=Paris` sa servera daje "0 properties are available in and
+ * around this destination". Zovemo isti servis IZ već otvorene Booking
+ * strane (isti kolačići i WAF token kao pravi posetilac).
+ */
+async function resolveBookingDest(
+  page: Page,
+  query: string
+): Promise<{ dest?: BookingDest; error?: string }> {
+  const key = query.toLowerCase();
+  const cached = destCache.get(key);
+  if (cached) return { dest: cached };
+
+  const result = await page
+    .evaluate(async (q) => {
+      try {
+        const res = await fetch("https://accommodations.booking.com/autocomplete.json", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ query: q, language: "en-us", size: 5 }),
+        });
+        if (!res.ok) return { error: `autocomplete HTTP ${res.status}` };
+        const data = (await res.json()) as {
+          results?: { dest_id?: string | number; dest_type?: string; label?: string; value?: string }[];
+        };
+        const hit = (data.results ?? []).find((r) => r.dest_id != null && r.dest_type);
+        return hit
+          ? { dest: { dest_id: String(hit.dest_id), dest_type: String(hit.dest_type), label: hit.label ?? hit.value } }
+          : { error: `autocomplete bez rezultata (${(data.results ?? []).length})` };
+      } catch (err) {
+        return { error: `autocomplete: ${String(err).slice(0, 80)}` };
+      }
+    }, query)
+    .catch((err: unknown) => ({ error: `autocomplete: ${String(err).slice(0, 80)}` }) as { dest?: BookingDest; error?: string });
+
+  if (result.dest) destCache.set(key, result.dest);
+  return result;
+}
+
 export async function searchBooking(params: SearchParams): Promise<Offer[]> {
   const { checkin, checkout, nights } = pickStayDates(params.month, params);
   const { context, release } = await acquireBrowserContext();
@@ -100,11 +168,13 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
     // Paris%2C+France") i vraćao praznu stranu bez hotela. Razmaci kao %20.
     const ss = (params.bookingQuery || params.destination).split(",")[0].trim();
     const q = (k: string, v: string | number) => `${k}=${encodeURIComponent(String(v))}`;
-    const urls = PAGES.map((offset) =>
+    const buildUrl = (offset: number, dest?: BookingDest) =>
+      "https://www.booking.com/searchresults.html?" +
       [
         q("ss", ss),
         q("ssne", ss),
         q("ssne_untouched", ss),
+        ...(dest ? [q("dest_id", dest.dest_id), q("dest_type", dest.dest_type)] : []),
         q("checkin", checkin),
         q("checkout", checkout),
         q("group_adults", params.adults),
@@ -114,20 +184,42 @@ export async function searchBooking(params: SearchParams): Promise<Offer[]> {
         q("selected_currency", "EUR"),
         q("lang", "en-us"),
         ...(offset ? [q("offset", offset)] : []),
-      ].join("&")
-    ).map((query) => `https://www.booking.com/searchresults.html?${query}`);
+      ].join("&");
 
-    // Strane redom (ne paralelno): druga strana tek ako je prva uspela i
-    // ostalo je vremena — manje opterećenje i isti WAF token za obe.
     const deadline = Date.now() + BOOKING_BUDGET_MS;
     const page = await context.newPage();
-    const raw: RawCard[] = await scrapePage(page, urls[0], deadline);
-    if (raw.length === 0) {
-      throw new Error(`Booking: ${await describeEmptyPage(page)}`);
+
+    // 1) Poznat dest_id (keš) → direktno. Inače prvo tekstualna pretraga,
+    //    koja ujedno otvori Booking i postavi WAF token.
+    let dest = destCache.get(ss.toLowerCase());
+    let raw: RawCard[] = await scrapePage(page, buildUrl(0, dest), deadline, false);
+    let destError: string | undefined;
+
+    // 2) Nema hotela → uzmi dest_id iz Booking-ovog servisa za predloge.
+    if (raw.length === 0 && !dest && deadline - Date.now() > 8000) {
+      const resolved = await resolveBookingDest(page, ss);
+      dest = resolved.dest;
+      destError = resolved.error;
+      if (dest) raw = await scrapePage(page, buildUrl(0, dest), deadline, true);
     }
-    for (const url of urls.slice(1)) {
+
+    // 3) I dalje ništa, a dest_id nemamo → ponovo tekstualna pretraga sada
+    //    kad je WAF token postavljen (hoteli ponekad stižu tek tada).
+    if (raw.length === 0 && !dest && deadline - Date.now() > 8000) {
+      raw = await scrapePage(page, buildUrl(0), deadline, true);
+    }
+
+    if (raw.length === 0) {
+      const destInfo = dest
+        ? `dest_id ${dest.dest_id} (${dest.dest_type}${dest.label ? `, ${dest.label}` : ""})`
+        : `dest_id nije pronađen — ${destError ?? "nije pokušano"}`;
+      throw new Error(`Booking: ${destInfo}; ${await describeEmptyPage(page)}`);
+    }
+
+    // Druga strana rezultata samo ako je ostalo vremena.
+    for (const offset of PAGES.slice(1)) {
       if (deadline - Date.now() < 10000) break;
-      raw.push(...(await scrapePage(page, url, deadline).catch(() => [])));
+      raw.push(...(await scrapePage(page, buildUrl(offset, dest), deadline, false).catch(() => [])));
     }
 
     const people = params.adults + params.children;
